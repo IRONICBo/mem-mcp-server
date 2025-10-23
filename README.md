@@ -38,6 +38,50 @@ Please see [docs/installation.md](docs/installation.md) for detailed installatio
 
 Please see [docs/installation_for_dev.md](docs/installation_for_dev.md) for detailed installation instructions.
 
+## CLI Commands
+
+Memov provides a powerful command-line interface for managing your project memory:
+
+### Core Commands
+
+- `mem init` - Initialize memov in your project
+- `mem track <files>` - Start tracking files
+- `mem snap` - Create a snapshot of current state
+- `mem history` - View all operations
+- `mem show <commit>` - Show snapshot details
+- `mem jump <commit>` - Restore to a specific snapshot
+- `mem status` - Show working directory status
+
+### 🔍 Semantic Search (NEW) 🪶 Lightweight
+
+Memov now includes vector database-powered semantic search with **zero heavy dependencies**:
+
+```bash
+# Search by natural language (similarity scores shown by default)
+mem search "authentication bug fix"
+
+# Search by files
+mem search "src/auth.py" --by-files
+
+# Filter and limit results
+mem search "refactor" --type snap --limit 5
+```
+
+**Features:**
+- 🧠 **Semantic understanding**: Finds similar prompts even with different words
+- 🎯 **File-based search**: Find all commits affecting specific files
+- 🏷️ **Type filtering**: Filter by operation type (track, snap, rename, remove)
+- 📊 **Rich output**: Beautiful tables with similarity scores
+- ⚡ **Fast**: Sub-second search on thousands of commits
+- 🪶 **Lightweight**: Only ~150MB total (no PyTorch required!)
+
+**Embedding Options:**
+- **Default** (Recommended): Built-in, ~50MB, works immediately ✨
+- **FastEmbed**: ONNX Runtime, ~30MB, better quality
+- **OpenAI API**: <5MB client, best quality, requires API key
+
+See [EMBEDDING_BACKENDS.md](EMBEDDING_BACKENDS.md) for backend comparison and [SEARCH_COMMAND.md](SEARCH_COMMAND.md) for usage.
+
 ## MCP Tools
 
 These are available to MCP clients through the server:
