@@ -19,6 +19,7 @@ from starlette.requests import Request
 from starlette.responses import PlainTextResponse
 
 from memov.core.manager import MemovManager, MemStatus
+from memov.debugging import DebugValidator
 
 LOGGER = logging.getLogger(__name__)
 
@@ -421,6 +422,211 @@ class MemMCPTools:
 
         except Exception as e:
             error_msg = f"[ERROR] Error in mem_sync: {str(e)}"
+            LOGGER.error(error_msg, exc_info=True)
+            return error_msg
+
+    @staticmethod
+    @mcp.tool()
+    def validate_commit(commit_hash: str, detailed: bool = True) -> str:
+        """Validate a specific commit by comparing prompt/response with actual code changes.
+
+        **Purpose:**
+        This tool helps debug and review AI-assisted development by checking if:
+        - The actual code changes align with the original prompt
+        - All intended files were modified
+        - No unexpected files were changed (context drift detection)
+        - The changes are reasonable in scope
+
+        **When to use:**
+        - After completing a feature to verify alignment
+        - When debugging unexpected behavior
+        - To review if previous changes match their stated intent
+        - When investigating potential context drift issues
+
+        **What it checks:**
+        1. Extracts prompt, response, and agent_plan from commit metadata
+        2. Identifies actual files changed in the commit
+        3. Compares expected files (from prompt) vs actual files changed
+        4. Calculates alignment score (0.0-1.0) based on multiple factors
+        5. Identifies issues and provides recommendations
+
+        Args:
+            commit_hash: The commit hash to validate (full or short form, e.g., "a1b2c3d")
+            detailed: If True, includes full details. If False, returns summary only. (default: True)
+
+        Returns:
+            Validation report with alignment analysis, issues, and recommendations
+        """
+        try:
+            LOGGER.info(f"validate_commit called for: {commit_hash}")
+
+            if MemMCPTools._project_path is None:
+                raise ValueError("Project path is not set.")
+
+            if not os.path.exists(MemMCPTools._project_path):
+                raise ValueError(f"Project path '{MemMCPTools._project_path}' does not exist.")
+
+            # Prepare the manager and validator
+            memov_manager = MemovManager(project_path=MemMCPTools._project_path)
+
+            # Check if memov is initialized
+            if (check_status := memov_manager.check()) is not MemStatus.SUCCESS:
+                return f"[ERROR] Memov not initialized: {check_status}. Run 'mem init' first."
+
+            # Create validator
+            validator = DebugValidator(memov_manager)
+
+            # Validate the commit
+            result = validator.validate_commit(commit_hash)
+
+            # Format output
+            lines = []
+            lines.append("=" * 70)
+            lines.append(f"VALIDATION REPORT: {result.commit_hash[:8]}")
+            lines.append("=" * 70)
+            lines.append("")
+
+            # Alignment summary
+            status = "✓ ALIGNED" if result.is_aligned else "✗ NOT ALIGNED"
+            lines.append(f"Status: {status}")
+            lines.append(f"Alignment Score: {result.alignment_score:.2f} / 1.00")
+            lines.append("")
+
+            # Prompt/Response info
+            if detailed:
+                if result.prompt:
+                    lines.append("Prompt:")
+                    lines.append(f"  {result.prompt[:200]}")
+                    if len(result.prompt) > 200:
+                        lines.append("  ...")
+                    lines.append("")
+
+                if result.agent_plan:
+                    lines.append("Agent Plan:")
+                    lines.append(f"  {result.agent_plan[:200]}")
+                    if len(result.agent_plan) > 200:
+                        lines.append("  ...")
+                    lines.append("")
+
+            # File changes summary
+            lines.append(f"Files Changed: {len(result.actual_changes)}")
+            if result.actual_changes:
+                for fc in result.actual_changes[:5]:
+                    lines.append(f"  [{fc.change_type.upper()}] {fc.file_path}")
+                if len(result.actual_changes) > 5:
+                    lines.append(f"  ... and {len(result.actual_changes) - 5} more")
+            lines.append("")
+
+            # Expected vs Actual
+            if result.expected_files:
+                lines.append(f"Expected Files (from prompt): {len(result.expected_files)}")
+                if detailed:
+                    for ef in result.expected_files[:3]:
+                        lines.append(f"  • {ef}")
+                    if len(result.expected_files) > 3:
+                        lines.append(f"  ... and {len(result.expected_files) - 3} more")
+                lines.append("")
+
+            # Issues
+            if result.unexpected_files:
+                lines.append(f"⚠ Unexpected Files: {len(result.unexpected_files)}")
+                for uf in result.unexpected_files[:3]:
+                    lines.append(f"  • {uf}")
+                if len(result.unexpected_files) > 3:
+                    lines.append(f"  ... and {len(result.unexpected_files) - 3} more")
+                lines.append("")
+
+            if result.missing_files:
+                lines.append(f"⚠ Missing Expected Files: {len(result.missing_files)}")
+                for mf in result.missing_files[:3]:
+                    lines.append(f"  • {mf}")
+                if len(result.missing_files) > 3:
+                    lines.append(f"  ... and {len(result.missing_files) - 3} more")
+                lines.append("")
+
+            # Issues and recommendations
+            if result.issues:
+                lines.append(f"Issues ({len(result.issues)}):")
+                for issue in result.issues:
+                    lines.append(f"  ✗ {issue}")
+                lines.append("")
+
+            if result.recommendations:
+                lines.append(f"Recommendations ({len(result.recommendations)}):")
+                for rec in result.recommendations:
+                    lines.append(f"  → {rec}")
+                lines.append("")
+
+            lines.append("=" * 70)
+
+            return "\n".join(lines)
+
+        except Exception as e:
+            error_msg = f"[ERROR] Error in validate_commit: {str(e)}"
+            LOGGER.error(error_msg, exc_info=True)
+            return error_msg
+
+    @staticmethod
+    @mcp.tool()
+    def validate_recent(n: int = 5) -> str:
+        """Validate the N most recent commits for alignment with their prompts.
+
+        **Purpose:**
+        Batch validation of recent commits to identify patterns of misalignment or context drift.
+        This is useful for reviewing a series of changes and ensuring overall quality.
+
+        **When to use:**
+        - At the end of a coding session to review all changes
+        - Before creating a pull request
+        - When debugging issues that may have originated from earlier changes
+        - To identify if context drift is occurring over time
+
+        **What it provides:**
+        - Summary statistics (total validated, aligned count, average score)
+        - Individual validation results for each commit
+        - Aggregate issues and recommendations
+
+        Args:
+            n: Number of recent commits to validate (default: 5, max: 20)
+
+        Returns:
+            Comprehensive validation report for recent commits
+        """
+        try:
+            LOGGER.info(f"validate_recent called for n={n}")
+
+            # Limit to reasonable number
+            n = min(max(1, n), 20)
+
+            if MemMCPTools._project_path is None:
+                raise ValueError("Project path is not set.")
+
+            if not os.path.exists(MemMCPTools._project_path):
+                raise ValueError(f"Project path '{MemMCPTools._project_path}' does not exist.")
+
+            # Prepare the manager and validator
+            memov_manager = MemovManager(project_path=MemMCPTools._project_path)
+
+            # Check if memov is initialized
+            if (check_status := memov_manager.check()) is not MemStatus.SUCCESS:
+                return f"[ERROR] Memov not initialized: {check_status}. Run 'mem init' first."
+
+            # Create validator
+            validator = DebugValidator(memov_manager)
+
+            # Validate recent commits
+            results = validator.validate_recent_commits(n)
+
+            if not results:
+                return "[INFO] No commits found to validate."
+
+            # Generate report
+            report = validator.generate_report(results)
+
+            return report
+
+        except Exception as e:
+            error_msg = f"[ERROR] Error in validate_recent: {str(e)}"
             LOGGER.error(error_msg, exc_info=True)
             return error_msg
 
