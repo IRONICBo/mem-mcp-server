@@ -97,13 +97,17 @@ class LLMClient:
                 **kwargs
             )
 
+            print("LLM Response:", response)
+
             # Extract content
             content = response.choices[0].message.content
 
             return {
                 'content': content,
                 'model': model,
-                'usage': response.usage._asdict() if hasattr(response, 'usage') else {}
+                # Unused now
+                # 'usage': response.usage._asdict() if hasattr(response, 'usage') else {}
+                'usage': response.usage
             }
 
         except Exception as e:

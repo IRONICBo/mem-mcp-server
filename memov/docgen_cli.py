@@ -40,7 +40,7 @@ logger = logging.getLogger(__name__)
 
 def init_components(
     project_path: str = ".",
-    model: str = "gpt-4o-mini"
+    model: str = "qwen2:0.5b"
 ) -> tuple:
     """
     Initialize all required components.
@@ -80,7 +80,7 @@ def generate_commit(
     commit_hash: Annotated[str, typer.Argument(help="Commit hash or reference (e.g., HEAD, abc123)")],
     output_dir: Annotated[str, typer.Option("--output", "-o", help="Output directory")] = ".mem/docs/commits",
     doc_type: Annotated[str, typer.Option("--type", "-t", help="Document type")] = "feature",
-    model: Annotated[str, typer.Option("--model", "-m", help="LLM model to use")] = "gpt-4o-mini",
+    model: Annotated[str, typer.Option("--model", "-m", help="LLM model to use")] = "qwen2:0.5b",
     with_diagram: Annotated[bool, typer.Option("--diagram", "-d", help="Generate mermaid diagrams")] = True,
     file_extensions: Annotated[Optional[str], typer.Option("--ext", help="Filter files by extensions (comma-separated)")] = ".py",
     project_path: Annotated[str, typer.Option("--path", "-p", help="Project path")] = ".",
