@@ -48,13 +48,15 @@ class MemovManager:
         self.branches_config_path = os.path.join(self.mem_root_path, "branches.json")
         self.memignore_path = os.path.join(self.project_path, ".memignore")
         self.vectordb_path = os.path.join(self.mem_root_path, "vectordb")
+        self.pending_writes_path = os.path.join(self.mem_root_path, "pending_writes.json")
 
         # Initialize VectorDB (lazy initialization - only when needed)
         self._vectordb: Optional[VectorDB] = None
 
         # Memory cache for pending VectorDB writes
         # Format: list of dicts with keys: operation_type, commit_hash, prompt, response, agent_plan, by_user, files
-        self._pending_writes: list[dict] = []
+        # Load from disk if exists (to persist across CLI command invocations)
+        self._pending_writes: list[dict] = self._load_pending_writes()
 
     @property
     def vectordb(self) -> VectorDB:
@@ -1089,6 +1091,32 @@ class MemovManager:
         else:
             return "unknown"
 
+    def _load_pending_writes(self) -> list[dict]:
+        """Load pending writes from disk if exists."""
+        if not os.path.exists(self.pending_writes_path):
+            return []
+
+        try:
+            with open(self.pending_writes_path, "r", encoding="utf-8") as f:
+                pending_writes = json.load(f)
+                LOGGER.debug(f"Loaded {len(pending_writes)} pending writes from disk")
+                return pending_writes
+        except Exception as e:
+            LOGGER.warning(f"Failed to load pending writes: {e}")
+            return []
+
+    def _save_pending_writes(self) -> None:
+        """Save pending writes to disk for persistence across CLI invocations."""
+        try:
+            # Create .mem directory if it doesn't exist
+            os.makedirs(self.mem_root_path, exist_ok=True)
+
+            with open(self.pending_writes_path, "w", encoding="utf-8") as f:
+                json.dump(self._pending_writes, f, indent=2, ensure_ascii=False)
+                LOGGER.debug(f"Saved {len(self._pending_writes)} pending writes to disk")
+        except Exception as e:
+            LOGGER.warning(f"Failed to save pending writes: {e}")
+
     def _add_to_pending_writes(
         self,
         operation_type: str,
@@ -1142,6 +1170,9 @@ class MemovManager:
                 f"Added commit {commit_hash} to pending writes cache "
                 f"(total pending: {len(self._pending_writes)})"
             )
+
+            # Save to disk for persistence across CLI invocations
+            self._save_pending_writes()
 
         except Exception as e:
             LOGGER.warning(f"Failed to add to pending writes: {e}")
@@ -1197,6 +1228,14 @@ class MemovManager:
         # Clear pending writes after sync
         self._pending_writes.clear()
 
+        # Remove the persistent file since all writes are now synced
+        if os.path.exists(self.pending_writes_path):
+            try:
+                os.remove(self.pending_writes_path)
+                LOGGER.debug("Removed pending_writes.json after sync")
+            except Exception as e:
+                LOGGER.warning(f"Failed to remove pending_writes.json: {e}")
+
         LOGGER.info(f"Sync completed: {successful} successful, {failed} failed")
         return (successful, failed)
 
@@ -1208,6 +1247,15 @@ class MemovManager:
         """Clear all pending writes without syncing (data will be lost)."""
         count = len(self._pending_writes)
         self._pending_writes.clear()
+
+        # Remove the persistent file
+        if os.path.exists(self.pending_writes_path):
+            try:
+                os.remove(self.pending_writes_path)
+                LOGGER.debug("Removed pending_writes.json after clear")
+            except Exception as e:
+                LOGGER.warning(f"Failed to remove pending_writes.json: {e}")
+
         LOGGER.warning(f"Cleared {count} pending writes without syncing")
 
     def find_similar_prompts(
