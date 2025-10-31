@@ -42,6 +42,32 @@ It gives AI coding agents a traceable memory layer beyond Git — auto-capturing
 - ♻️ **Change reuse**: Reapply past code edits by description to save tokens when iterating on a feature
 - 🔍 **History-driven optimization**: Use past records and failed generations as reference context to boost future outputs
 
+## Why MemoV vs. [Aardvark](https://openai.com/index/introducing-aardvark/)?
+
+While OpenAI's Aardvark focuses on automated security vulnerability detection, **MemoV is an open-source solution** that empowers developers with comprehensive coding context management and visualization.
+
+### 🔓 **Open Source First**
+- **MemoV**: Fully open-source (MIT License) - inspect, modify, and contribute freely
+- **Aardvark**: Proprietary, private beta with limited access
+
+### 🎯 **Different Focus Areas**
+| Feature | MemoV | Aardvark |
+|---------|-------|----------|
+| **Primary Goal** | Context isolation & commit visualization for AI coding | Security vulnerability detection |
+| **Granularity** | Branch & commit-level documentation preview | Repository-wide security scanning |
+| **Debugging** | Vibe debugging with context isolation | Vulnerability validation in sandboxed environments |
+| **Visualization** | Rich commit visualization & memory timeline | Security threat modeling & patch suggestions |
+| **Integration** | Works with any AI coding agent/LLM | Integrated with GitHub & OpenAI Codex |
+
+### 🚀 **Core Advantages**
+- **🔍 Commit Visualization**: Visual timeline of every prompt, plan, and code change - see exactly how your code evolved
+- **🧩 Context Isolation**: Isolate and debug specific contexts across different LLMs without losing track
+- **📋 Branch-level Documentation**: Preview documentation at both branch and commit granularity
+- **🎨 Vibe Debugging**: Unique approach to debugging by isolating faulty context for 5× faster fixes
+- **🌐 Universal Compatibility**: Works with any AI coding agent, not limited to specific platforms
+
+**MemoV complements security tools like Aardvark** by providing the missing layer of development context and memory management that makes AI-assisted coding more traceable, debuggable, and collaborative.
+
 
 ## Installation
 
