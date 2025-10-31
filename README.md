@@ -4,7 +4,7 @@
   </a>
 </p>
 
-# Never forget a commit. Never touch your Git.
+# Never forget a commit, and vibe debugging
 
 <div align="center">
 
@@ -20,7 +20,7 @@ MemoV = Prompt + Context + CodeDiff
   <img src="docs/images/readme.gif" alt="MemoV Demo" width="800px">
 </p>
 
-It gives AI coding agents a traceable memory layer beyond Git — auto-capturing **every prompt**, **agent plan**, and **code change** in a separate timeline. Work freely with AI, iterate fast, and keep your Git history clean. When you're ready, cherry-pick what matters for Git commits.
+It gives AI coding agents a traceable memory layer beyond Git — auto-capturing **every prompt**, **agent plan**, and **code change** in a separate timeline. Work freely with AI, iterate fast, and keep your Git history clean. When you're ready, cherry-pick what matters for Git commits. Based on memory, we built an open source Aardvark: OpenAI’s agentic security researcher.
 
 - 💬 [Join our Discord](https://discord.gg/un54aD7Hug) and dive into smarter context engineering
 - 🌐 [Visit memov.ai](https://memov.ai) to visualize your coding memory and supercharge existing GitHub repos
