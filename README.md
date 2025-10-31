@@ -44,29 +44,26 @@ It gives AI coding agents a traceable memory layer beyond Git — auto-capturing
 
 ## Why MemoV vs. [Aardvark](https://openai.com/index/introducing-aardvark/)?
 
-While OpenAI's Aardvark focuses on automated security vulnerability detection, **MemoV is an open-source solution** that empowers developers with comprehensive coding context management and visualization.
+While OpenAI's Aardvark operates at the git commit level, **MemoV captures context at a much finer granularity** — every AI interaction — preserving the full story that commits lose.
 
-### 🔓 **Open Source First**
-- **MemoV**: Fully open-source (MIT License) - inspect, modify, and contribute freely
-- **Aardvark**: Proprietary, private beta with limited access
+<p align="center">
+  <img src="docs/images/memov-debug.png" alt="MemoV Context Isolation and Auto Debugging" width="600px">
+</p>
 
-### 🎯 **Different Focus Areas**
-| Feature | MemoV | Aardvark |
-|---------|-------|----------|
-| **Primary Goal** | Context isolation & commit visualization for AI coding | Security vulnerability detection |
-| **Granularity** | Branch & commit-level documentation preview | Repository-wide security scanning |
-| **Debugging** | Vibe debugging with context isolation | Vulnerability validation in sandboxed environments |
-| **Visualization** | Rich commit visualization & memory timeline | Security threat modeling & patch suggestions |
-| **Integration** | Works with any AI coding agent/LLM | Integrated with GitHub & OpenAI Codex |
+| Aspect | MemoV | Aardvark |
+|--------|-------|----------|
+| **Tracking Level** | Per AI interaction | Per git commit |
+| **Context Captured** | Intent + Plan + Code Changes | Only code changes |
+| **Information Loss** | Minimal - full conversation preserved | High - iterations & intent lost |
+| **Debugging** | Backtrace to exact prompt/plan that caused bug | Only know which commit broke things |
+| **Open Source** | ✅ MIT License | ❌ Proprietary |
 
-### 🚀 **Core Advantages**
-- **🔍 Commit Visualization**: Visual timeline of every prompt, plan, and code change - see exactly how your code evolved
-- **🧩 Context Isolation**: Isolate and debug specific contexts across different LLMs without losing track
-- **📋 Branch-level Documentation**: Preview documentation at both branch and commit granularity
-- **🎨 Vibe Debugging**: Unique approach to debugging by isolating faulty context for 5× faster fixes
-- **🌐 Universal Compatibility**: Works with any AI coding agent, not limited to specific platforms
+**Key advantages**:
+- 🔬 **Finer Granularity**: Captures user intent, AI plans, and code evolution — not just final diffs
+- 🐞 **Backtrace Debugging**: Trace bugs back to the exact interaction, replay context across LLMs for 5× faster fixes
+- 🔓 **Open Source**: Fully transparent, extensible, and community-driven
 
-**MemoV complements security tools like Aardvark** by providing the missing layer of development context and memory management that makes AI-assisted coding more traceable, debuggable, and collaborative.
+See [MEMOV_VS_AARDVARK.md](docs/MEMOV_VS_AARDVARK.md) for comprehensive comparison.
 
 
 ## Installation
@@ -96,8 +93,6 @@ These are available to MCP clients through the server:
 
 - `validate_recent(n: int = 5)`
   - Validate the N most recent commits for alignment patterns. Useful for session reviews and quality assurance.
-
-See [DEBUGGING_VALIDATION.md](DEBUGGING_VALIDATION.md) for comprehensive documentation on validation features.
 
 ### Health Check
 
