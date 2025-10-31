@@ -86,13 +86,19 @@ These are available to MCP clients through the server:
 - `mem_sync()`
   - Sync all pending operations to VectorDB for semantic search capabilities.
 
-### Validation & Debugging (NEW)
+### Validation & Debugging
 
 - `validate_commit(commit_hash: str, detailed: bool = True)`
   - Validate a specific commit by comparing prompt/response with actual code changes. Detects context drift and alignment issues.
 
 - `validate_recent(n: int = 5)`
   - Validate the N most recent commits for alignment patterns. Useful for session reviews and quality assurance.
+
+- `vibe_debug(query: str, error_message: str = "", stack_trace: str = "", user_logs: str = "", models: str = "", n_results: int = 5)`
+  - Debug issues using RAG search + multi-model LLM comparison. Searches code history for relevant context and queries multiple AI models (GPT-4, Claude, Gemini) in parallel for diverse debugging insights.
+
+- `vibe_search(query: str, n_results: int = 5, content_type: str = "")`
+  - Fast semantic search through code history (prompts, responses, agent plans, code changes) without LLM analysis. Perfect for quick context lookup.
 
 ### Health Check
 
