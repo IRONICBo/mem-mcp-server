@@ -19,6 +19,9 @@ from starlette.requests import Request
 from starlette.responses import PlainTextResponse
 
 from memov.core.manager import MemovManager, MemStatus
+from memov.debugging import DebugValidator
+from memov.debugging.rag_debugger import RAGDebugger, DebugContext
+from memov.debugging.llm_client import LLMClient
 
 LOGGER = logging.getLogger(__name__)
 
@@ -342,10 +345,18 @@ class MemMCPTools:
                 if agent_plan_str:
                     result_parts.append(f"Agent plan: {len(agent_plan_str)} characters")
                 result_parts.append(f"AI changes: {', '.join(files_processed)}")
-                result_parts.append(
-                    f"\n[NOTE] Changes are cached in memory. Run 'mem sync' to persist to VectorDB for search."
-                )
                 result = "\n".join(result_parts)
+
+                # Auto-sync to VectorDB after recording changes
+                LOGGER.info("Auto-syncing to VectorDB after snap...")
+                pending_count = memov_manager.get_pending_writes_count()
+                if pending_count > 0:
+                    successful, failed = memov_manager.sync_to_vectordb()
+                    if failed == 0:
+                        result += f"\n[AUTO-SYNC] Successfully synced {successful} operation(s) to VectorDB"
+                    else:
+                        result += f"\n[AUTO-SYNC] Synced with errors: {successful} successful, {failed} failed"
+
                 LOGGER.info(f"Operation completed successfully: {result}")
                 return result
 
@@ -354,32 +365,288 @@ class MemMCPTools:
             LOGGER.error(error_msg, exc_info=True)
             return error_msg
 
+
     @staticmethod
     @mcp.tool()
-    def mem_sync() -> str:
-        """Sync all pending operations to VectorDB for semantic search.
+    def validate_commit(commit_hash: str, detailed: bool = True) -> str:
+        """Validate a specific commit by comparing prompt/response with actual code changes.
 
-        **CRITICAL: This must be called periodically to enable semantic search!**
+        **Purpose:**
+        This tool helps debug and review AI-assisted development by checking if:
+        - The actual code changes align with the original prompt
+        - All intended files were modified
+        - No unexpected files were changed (context drift detection)
+        - The changes are reasonable in scope
 
-        This tool batch writes all cached operations (from snap, track, etc.) to the VectorDB.
-        Without calling this tool, operations will only exist in memory and won't be searchable.
+        **When to use:**
+        - After completing a feature to verify alignment
+        - When debugging unexpected behavior
+        - To review if previous changes match their stated intent
+        - When investigating potential context drift issues
 
-        **When to call:**
-        - After a series of snap operations (e.g., every 3-5 snaps)
-        - At the end of a work session
-        - Before running semantic search queries
-        - When explicitly requested by the user
+        **What it checks:**
+        1. Extracts prompt, response, and agent_plan from commit metadata
+        2. Identifies actual files changed in the commit
+        3. Compares expected files (from prompt) vs actual files changed
+        4. Calculates alignment score (0.0-1.0) based on multiple factors
+        5. Identifies issues and provides recommendations
 
-        **What happens:**
-        - Writes all pending operations to VectorDB with splitted embeddings
-        - Prompt, response, and agent_plan are stored as separate searchable documents
-        - Enables semantic search by prompt, response, or agent plan
+        Args:
+            commit_hash: The commit hash to validate (full or short form, e.g., "a1b2c3d")
+            detailed: If True, includes full details. If False, returns summary only. (default: True)
 
         Returns:
-            Result message with sync statistics (successful/failed writes)
+            Validation report with alignment analysis, issues, and recommendations
         """
         try:
-            LOGGER.info("mem_sync called")
+            LOGGER.info(f"validate_commit called for: {commit_hash}")
+
+            if MemMCPTools._project_path is None:
+                raise ValueError("Project path is not set.")
+
+            if not os.path.exists(MemMCPTools._project_path):
+                raise ValueError(f"Project path '{MemMCPTools._project_path}' does not exist.")
+
+            # Prepare the manager and validator
+            memov_manager = MemovManager(project_path=MemMCPTools._project_path)
+
+            # Check if memov is initialized
+            if (check_status := memov_manager.check()) is not MemStatus.SUCCESS:
+                return f"[ERROR] Memov not initialized: {check_status}. Run 'mem init' first."
+
+            # Create validator
+            validator = DebugValidator(memov_manager)
+
+            # Validate the commit
+            result = validator.validate_commit(commit_hash)
+
+            # Format output
+            lines = []
+            lines.append("=" * 70)
+            lines.append(f"VALIDATION REPORT: {result.commit_hash[:8]}")
+            lines.append("=" * 70)
+            lines.append("")
+
+            # Alignment summary
+            status = "✓ ALIGNED" if result.is_aligned else "✗ NOT ALIGNED"
+            lines.append(f"Status: {status}")
+            lines.append(f"Alignment Score: {result.alignment_score:.2f} / 1.00")
+            lines.append("")
+
+            # Prompt/Response info
+            if detailed:
+                if result.prompt:
+                    lines.append("Prompt:")
+                    lines.append(f"  {result.prompt[:200]}")
+                    if len(result.prompt) > 200:
+                        lines.append("  ...")
+                    lines.append("")
+
+                if result.agent_plan:
+                    lines.append("Agent Plan:")
+                    lines.append(f"  {result.agent_plan[:200]}")
+                    if len(result.agent_plan) > 200:
+                        lines.append("  ...")
+                    lines.append("")
+
+            # File changes summary
+            lines.append(f"Files Changed: {len(result.actual_changes)}")
+            if result.actual_changes:
+                for fc in result.actual_changes[:5]:
+                    lines.append(f"  [{fc.change_type.upper()}] {fc.file_path}")
+                if len(result.actual_changes) > 5:
+                    lines.append(f"  ... and {len(result.actual_changes) - 5} more")
+            lines.append("")
+
+            # Expected vs Actual
+            if result.expected_files:
+                lines.append(f"Expected Files (from prompt): {len(result.expected_files)}")
+                if detailed:
+                    for ef in result.expected_files[:3]:
+                        lines.append(f"  • {ef}")
+                    if len(result.expected_files) > 3:
+                        lines.append(f"  ... and {len(result.expected_files) - 3} more")
+                lines.append("")
+
+            # Issues
+            if result.unexpected_files:
+                lines.append(f"⚠ Unexpected Files: {len(result.unexpected_files)}")
+                for uf in result.unexpected_files[:3]:
+                    lines.append(f"  • {uf}")
+                if len(result.unexpected_files) > 3:
+                    lines.append(f"  ... and {len(result.unexpected_files) - 3} more")
+                lines.append("")
+
+            if result.missing_files:
+                lines.append(f"⚠ Missing Expected Files: {len(result.missing_files)}")
+                for mf in result.missing_files[:3]:
+                    lines.append(f"  • {mf}")
+                if len(result.missing_files) > 3:
+                    lines.append(f"  ... and {len(result.missing_files) - 3} more")
+                lines.append("")
+
+            # Issues and recommendations
+            if result.issues:
+                lines.append(f"Issues ({len(result.issues)}):")
+                for issue in result.issues:
+                    lines.append(f"  ✗ {issue}")
+                lines.append("")
+
+            if result.recommendations:
+                lines.append(f"Recommendations ({len(result.recommendations)}):")
+                for rec in result.recommendations:
+                    lines.append(f"  → {rec}")
+                lines.append("")
+
+            lines.append("=" * 70)
+
+            return "\n".join(lines)
+
+        except Exception as e:
+            error_msg = f"[ERROR] Error in validate_commit: {str(e)}"
+            LOGGER.error(error_msg, exc_info=True)
+            return error_msg
+
+    @staticmethod
+    @mcp.tool()
+    def validate_recent(n: int = 5) -> str:
+        """Validate the N most recent commits for alignment with their prompts.
+
+        **Purpose:**
+        Batch validation of recent commits to identify patterns of misalignment or context drift.
+        This is useful for reviewing a series of changes and ensuring overall quality.
+
+        **When to use:**
+        - At the end of a coding session to review all changes
+        - Before creating a pull request
+        - When debugging issues that may have originated from earlier changes
+        - To identify if context drift is occurring over time
+
+        **What it provides:**
+        - Summary statistics (total validated, aligned count, average score)
+        - Individual validation results for each commit
+        - Aggregate issues and recommendations
+
+        Args:
+            n: Number of recent commits to validate (default: 5, max: 20)
+
+        Returns:
+            Comprehensive validation report for recent commits
+        """
+        try:
+            LOGGER.info(f"validate_recent called for n={n}")
+
+            # Limit to reasonable number
+            n = min(max(1, n), 20)
+
+            if MemMCPTools._project_path is None:
+                raise ValueError("Project path is not set.")
+
+            if not os.path.exists(MemMCPTools._project_path):
+                raise ValueError(f"Project path '{MemMCPTools._project_path}' does not exist.")
+
+            # Prepare the manager and validator
+            memov_manager = MemovManager(project_path=MemMCPTools._project_path)
+
+            # Check if memov is initialized
+            if (check_status := memov_manager.check()) is not MemStatus.SUCCESS:
+                return f"[ERROR] Memov not initialized: {check_status}. Run 'mem init' first."
+
+            # Create validator
+            validator = DebugValidator(memov_manager)
+
+            # Validate recent commits
+            results = validator.validate_recent_commits(n)
+
+            if not results:
+                return "[INFO] No commits found to validate."
+
+            # Generate report
+            report = validator.generate_report(results)
+
+            return report
+
+        except Exception as e:
+            error_msg = f"[ERROR] Error in validate_recent: {str(e)}"
+            LOGGER.error(error_msg, exc_info=True)
+            return error_msg
+
+    @staticmethod
+    @mcp.tool()
+    def vibe_debug(
+        query: str,
+        error_message: str = "",
+        stack_trace: str = "",
+        user_logs: str = "",
+        models: str = "",
+        n_results: int = 5,
+    ) -> str:
+        """Debug code issues using RAG search + multi-model LLM comparison (VIBE debugging).
+
+        **Purpose:**
+        This tool combines the power of:
+        1. **RAG (Retrieval Augmented Generation)**: Searches your code history to find
+           relevant context, similar issues, and related code changes
+        2. **Multi-model LLM comparison**: Queries multiple AI models (GPT-4, Claude, Gemini)
+           in parallel to get diverse debugging insights and recommendations
+
+        **When to use:**
+        - Encountering runtime errors or bugs
+        - Need to understand why code is behaving unexpectedly
+        - Want multiple AI perspectives on a complex issue
+        - Looking for historical context about similar problems
+        - Need actionable debugging recommendations
+
+        **What it does:**
+        1. Searches VectorDB for relevant code history using your query + error info
+        2. Retrieves similar commits, prompts, and code changes
+        3. Builds comprehensive context with error traces and logs
+        4. Queries multiple LLM models in parallel for analysis
+        5. Compares responses and extracts consensus recommendations
+
+        **Requirements:**
+        - VectorDB must be populated (run `mem sync` first)
+        - LiteLLM installed: `pip install litellm`
+        - API keys configured for desired models:
+          - OPENAI_API_KEY for GPT models
+          - ANTHROPIC_API_KEY for Claude
+          - GEMINI_API_KEY or GOOGLE_API_KEY for Gemini
+          - COHERE_API_KEY for Command models
+          - MISTRAL_API_KEY for Mistral models
+
+        Args:
+            query: Main debug question (e.g., "Why is the API returning 500 errors?")
+            error_message: Error message text (optional)
+            stack_trace: Stack trace or error traceback (optional)
+            user_logs: Relevant log output (optional)
+            models: Comma-separated list of model names to query (optional)
+                   Examples: "gpt-4o-mini,claude-3-5-sonnet-20241022,gemini/gemini-1.5-flash"
+                   Default: Uses GPT-4o-mini, Claude Sonnet, Gemini Flash
+            n_results: Number of relevant code snippets to retrieve (default: 5)
+
+        Returns:
+            Comprehensive debugging report with:
+            - RAG-retrieved relevant code context
+            - Analysis from each LLM model
+            - Consensus recommendations
+            - Specific fix suggestions
+
+        Examples:
+            1. Simple error debugging:
+               query="API endpoint returning 500",
+               error_message="Internal Server Error",
+               stack_trace="<full traceback>"
+
+            2. Performance issue:
+               query="Database queries are slow",
+               user_logs="Query took 5.2s to execute"
+
+            3. Custom models:
+               query="Authentication failing",
+               models="gpt-4o,claude-3-5-sonnet-20241022"
+        """
+        try:
+            LOGGER.info(f"vibe_debug called with query: {query}")
 
             if MemMCPTools._project_path is None:
                 raise ValueError("Project path is not set.")
@@ -394,33 +661,172 @@ class MemMCPTools:
             if (check_status := memov_manager.check()) is not MemStatus.SUCCESS:
                 return f"[ERROR] Memov not initialized: {check_status}. Run 'mem init' first."
 
-            # Get pending writes count
-            pending_count = memov_manager.get_pending_writes_count()
+            # Check if VectorDB has data
+            db_info = memov_manager.get_vectordb_info()
+            if db_info.get("count", 0) == 0:
+                return (
+                    "[ERROR] VectorDB is empty. Please run 'mem sync' first to populate "
+                    "the database with your code history."
+                )
 
-            if pending_count == 0:
-                LOGGER.info("No pending writes to sync")
-                return "[INFO] No pending operations to sync. All up to date!"
+            # Parse models if provided
+            model_list = None
+            if models and models.strip():
+                model_list = [m.strip() for m in models.split(",") if m.strip()]
 
-            LOGGER.info(f"Syncing {pending_count} pending operation(s) to VectorDB...")
+            # Create LLM client and debugger
+            try:
+                llm_client = LLMClient(models=model_list) if model_list else LLMClient()
+            except ImportError:
+                return (
+                    "[ERROR] LiteLLM not installed. Install with: pip install litellm\n\n"
+                    "Also configure API keys:\n"
+                    "  export OPENAI_API_KEY=your_key\n"
+                    "  export ANTHROPIC_API_KEY=your_key\n"
+                    "  export GEMINI_API_KEY=your_key"
+                )
 
-            # Perform sync
-            successful, failed = memov_manager.sync_to_vectordb()
+            debugger = RAGDebugger(memov_manager, llm_client)
 
-            # Build result message
-            if failed == 0:
-                result = f"[SUCCESS] Synced {successful} operation(s) to VectorDB\n"
-                result += "All operations are now searchable via semantic search!"
-            else:
-                result = f"[PARTIAL SUCCESS] Sync completed with errors:\n"
-                result += f"  ✓ Successful: {successful}\n"
-                result += f"  ✗ Failed: {failed}\n"
-                result += f"Check logs for error details."
+            # Build debug context using RAG
+            LOGGER.info("Building debug context with RAG...")
+            context = debugger.build_debug_context(
+                query=query,
+                error_message=error_message if error_message else None,
+                stack_trace=stack_trace if stack_trace else None,
+                user_logs=user_logs if user_logs else None,
+                n_results=n_results,
+            )
 
-            LOGGER.info(f"Sync completed: {successful} successful, {failed} failed")
-            return result
+            # Query multiple LLMs
+            LOGGER.info("Querying multiple LLM models...")
+            result = debugger.debug_with_llm(
+                query=query,
+                context=context,
+                models=model_list,
+                use_async=True,
+            )
+
+            # Format and return result
+            report = debugger.format_debug_result(result, include_full_responses=True)
+
+            LOGGER.info("VIBE debugging completed successfully")
+            return report
 
         except Exception as e:
-            error_msg = f"[ERROR] Error in mem_sync: {str(e)}"
+            error_msg = f"[ERROR] Error in vibe_debug: {str(e)}"
+            LOGGER.error(error_msg, exc_info=True)
+            return error_msg
+
+    @staticmethod
+    @mcp.tool()
+    def vibe_search(query: str, n_results: int = 5, content_type: str = "") -> str:
+        """Search code history using RAG (without LLM analysis).
+
+        **Purpose:**
+        Fast semantic search through your code history to find relevant:
+        - Prompts: What you asked the AI to do
+        - Responses: What the AI said it did
+        - Agent plans: High-level summaries of changes made
+        - Code changes: Which files were modified
+
+        Use this when you need quick context retrieval without full LLM analysis.
+
+        **When to use:**
+        - Finding when a specific feature was added
+        - Locating code that handles similar functionality
+        - Understanding when/why a file was changed
+        - Quick historical context lookup
+
+        Args:
+            query: Search query (natural language)
+            n_results: Number of results to return (default: 5, max: 20)
+            content_type: Filter by content type: "prompt", "response", "agent_plan", or "" for all
+
+        Returns:
+            Formatted search results with relevance scores and commit info
+
+        Examples:
+            query="authentication implementation"
+            query="database connection", content_type="agent_plan"
+            query="API error handling", n_results=10
+        """
+        try:
+            LOGGER.info(f"vibe_search called with query: {query}")
+
+            if MemMCPTools._project_path is None:
+                raise ValueError("Project path is not set.")
+
+            if not os.path.exists(MemMCPTools._project_path):
+                raise ValueError(f"Project path '{MemMCPTools._project_path}' does not exist.")
+
+            # Prepare the manager
+            memov_manager = MemovManager(project_path=MemMCPTools._project_path)
+
+            # Check if memov is initialized
+            if (check_status := memov_manager.check()) is not MemStatus.SUCCESS:
+                return f"[ERROR] Memov not initialized: {check_status}. Run 'mem init' first."
+
+            # Limit results
+            n_results = min(max(1, n_results), 20)
+
+            # Search
+            debugger = RAGDebugger(memov_manager, llm_client=None)
+
+            if content_type and content_type.strip():
+                content_types = [content_type.strip()]
+            else:
+                content_types = ["prompt", "response", "agent_plan"]
+
+            results = debugger.search_relevant_code(
+                query=query,
+                n_results=n_results,
+                content_types=content_types,
+            )
+
+            # Format results
+            lines = []
+            lines.append("=" * 80)
+            lines.append("🔍 RAG SEARCH RESULTS")
+            lines.append("=" * 80)
+            lines.append("")
+            lines.append(f"Query: {query}")
+            lines.append(f"Found: {len(results)} results")
+            lines.append("")
+
+            for i, result in enumerate(results, 1):
+                metadata = result.get("metadata", {})
+                text = result.get("text", "")
+                distance = result.get("distance", 1.0)
+                relevance = 1.0 - distance
+
+                commit_hash = metadata.get("commit_hash", "unknown")
+                content_type_val = metadata.get("content_type", "unknown")
+                files = metadata.get("files", "")
+                operation = metadata.get("operation_type", "unknown")
+
+                lines.append(f"[{i}] Relevance: {relevance:.2f}")
+                lines.append(f"    Commit: {commit_hash[:8]}")
+                lines.append(f"    Type: {content_type_val}")
+                lines.append(f"    Operation: {operation}")
+
+                if files:
+                    files_list = [f.strip() for f in files.split(",") if f.strip()]
+                    lines.append(f"    Files: {', '.join(files_list[:3])}")
+                    if len(files_list) > 3:
+                        lines.append(f"           ... and {len(files_list) - 3} more")
+
+                # Show text preview
+                preview = text[:200] + "..." if len(text) > 200 else text
+                lines.append(f"    Content: {preview}")
+                lines.append("")
+
+            lines.append("=" * 80)
+
+            return "\n".join(lines)
+
+        except Exception as e:
+            error_msg = f"[ERROR] Error in vibe_search: {str(e)}"
             LOGGER.error(error_msg, exc_info=True)
             return error_msg
 
