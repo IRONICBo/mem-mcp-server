@@ -42,6 +42,29 @@ It gives AI coding agents a traceable memory layer beyond Git — auto-capturing
 - ♻️ **Change reuse**: Reapply past code edits by description to save tokens when iterating on a feature
 - 🔍 **History-driven optimization**: Use past records and failed generations as reference context to boost future outputs
 
+## Why MemoV vs. [Aardvark](https://openai.com/index/introducing-aardvark/)?
+
+While OpenAI's Aardvark operates at the git commit level, **MemoV captures context at a much finer granularity** — every AI interaction — preserving the full story that commits lose.
+
+<p align="center">
+  <img src="docs/images/memov-debug.png" alt="MemoV Context Isolation and Auto Debugging" width="600px">
+</p>
+
+| Aspect | MemoV | Aardvark |
+|--------|-------|----------|
+| **Tracking Level** | Per AI interaction | Per git commit |
+| **Context Captured** | Intent + Plan + Code Changes | Only code changes |
+| **Information Loss** | Minimal - full conversation preserved | High - iterations & intent lost |
+| **Debugging** | Backtrace to exact prompt/plan that caused bug | Only know which commit broke things |
+| **Open Source** | ✅ MIT License | ❌ Proprietary |
+
+**Key advantages**:
+- 🔬 **Finer Granularity**: Captures user intent, AI plans, and code evolution — not just final diffs
+- 🐞 **Backtrace Debugging**: Trace bugs back to the exact interaction, replay context across LLMs for 5× faster fixes
+- 🔓 **Open Source**: Fully transparent, extensible, and community-driven
+
+See [MEMOV_VS_AARDVARK.md](docs/MEMOV_VS_AARDVARK.md) for comprehensive comparison.
+
 
 ## Installation
 
@@ -63,7 +86,7 @@ These are available to MCP clients through the server:
 - `mem_sync()`
   - Sync all pending operations to VectorDB for semantic search capabilities.
 
-### Validation & Debugging (NEW)
+### Validation & Debugging
 
 - `validate_commit(commit_hash: str, detailed: bool = True)`
   - Validate a specific commit by comparing prompt/response with actual code changes. Detects context drift and alignment issues.
@@ -71,7 +94,11 @@ These are available to MCP clients through the server:
 - `validate_recent(n: int = 5)`
   - Validate the N most recent commits for alignment patterns. Useful for session reviews and quality assurance.
 
-See [DEBUGGING_VALIDATION.md](DEBUGGING_VALIDATION.md) for comprehensive documentation on validation features.
+- `vibe_debug(query: str, error_message: str = "", stack_trace: str = "", user_logs: str = "", models: str = "", n_results: int = 5)`
+  - Debug issues using RAG search + multi-model LLM comparison. Searches code history for relevant context and queries multiple AI models (GPT-4, Claude, Gemini) in parallel for diverse debugging insights.
+
+- `vibe_search(query: str, n_results: int = 5, content_type: str = "")`
+  - Fast semantic search through code history (prompts, responses, agent plans, code changes) without LLM analysis. Perfect for quick context lookup.
 
 ### Health Check
 
