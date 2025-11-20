@@ -187,6 +187,68 @@ def version() -> None:
 
 
 @app.command()
+def report(
+    loc: LocOption = ".",
+    format: Annotated[
+        str,
+        typer.Option(
+            "--format",
+            "-f",
+            help="Output format (json, text)",
+        ),
+    ] = "json",
+) -> None:
+    """Generate a report of the latest commit with all necessary information for external MCP operations.
+
+    This command outputs commit information in a format suitable for external MCP snap operations,
+    including commit hash, diff, branch name, and parent commit.
+
+    Example:
+        # Get JSON report for external MCP
+        mem report
+
+        # Save report to file
+        mem report > commit_info.json
+
+        # Use with bash variables
+        REPORT=$(mem report)
+        COMMIT_HASH=$(echo $REPORT | jq -r '.commit_hash')
+    """
+    import json
+
+    manager = get_manager(loc)
+
+    # Generate report
+    report_data = manager.report(format=format)
+
+    if report_data is None:
+        console.print("[yellow]No commits found in memov repository[/yellow]")
+        sys.exit(1)
+
+    # Output based on format
+    if format == "json":
+        # Output as JSON to stdout (without rich formatting)
+        print(json.dumps(report_data, indent=2, ensure_ascii=False))
+    elif format == "text":
+        # Output as human-readable text
+        console.print(f"[bold cyan]Commit Report[/bold cyan]")
+        console.print(f"[bold]Commit Hash:[/bold] {report_data['commit_hash']}")
+        console.print(f"[bold]Branch:[/bold] {report_data['branch'] or 'N/A'}")
+        console.print(f"[bold]Parent Commit:[/bold] {report_data['parent_commit'] or 'N/A'}")
+        console.print(f"[bold]Commit Message:[/bold] {report_data['commit_message']}")
+        console.print(f"\n[bold]Metadata:[/bold]")
+        console.print(f"  Prompt: {report_data['metadata']['prompt'] or 'N/A'}")
+        console.print(f"  Response: {report_data['metadata']['response'] or 'N/A'}")
+        console.print(f"  Source: {report_data['metadata']['source'] or 'N/A'}")
+        console.print(f"  Files: {', '.join(report_data['metadata']['files']) or 'N/A'}")
+        console.print(f"\n[bold]Diff:[/bold]")
+        console.print(report_data['diff'])
+    else:
+        console.print(f"[red]Unsupported format: {format}[/red]")
+        sys.exit(1)
+
+
+@app.command()
 def sync(loc: LocOption = ".") -> None:
     """Sync pending operations to VectorDB for semantic search.
 
