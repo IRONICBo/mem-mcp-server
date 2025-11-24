@@ -1330,3 +1330,99 @@ class MemovManager:
         except Exception as e:
             LOGGER.error(f"Error getting VectorDB info: {e}")
             return {}
+
+    def report(self, format: str = "json") -> Optional[dict]:
+        """
+        Generate a report of the latest commit with all necessary information
+        for external MCP snap operations.
+
+        This method retrieves:
+        - commit_hash: Latest commit hash
+        - commit_message: Commit message (from Prompt field)
+        - diff: Git diff output
+        - branch: Current branch name
+        - parent_commit: Parent commit hash (empty if no parent)
+
+        Args:
+            format: Output format, currently only "json" is supported
+
+        Returns:
+            Dictionary with commit information, or None if no commits exist
+        """
+        try:
+            # Get the latest commit (HEAD)
+            head_commit = GitManager.get_commit_id_by_ref(
+                self.bare_repo_path, "refs/memov/HEAD", verbose=False
+            )
+            if not head_commit:
+                LOGGER.warning("No commits found in memov repository")
+                return None
+
+            # Get branch information
+            branches = self._load_branches()
+            current_branch = branches.get("current", "") if branches else ""
+
+            # Get commit message and extract prompt
+            commit_message = GitManager.get_commit_message(self.bare_repo_path, head_commit)
+            prompt = ""
+            response = ""
+            source = ""
+
+            # Parse commit message
+            for line in commit_message.splitlines():
+                if line.startswith("Prompt:"):
+                    prompt = line[len("Prompt:") :].strip()
+                elif line.startswith("Response:"):
+                    response = line[len("Response:") :].strip()
+                elif line.startswith("Source:"):
+                    source = line[len("Source:") :].strip()
+
+            # Check for git notes (overrides commit message)
+            note_content = GitManager.get_commit_note(self.bare_repo_path, head_commit)
+            if note_content:
+                for line in note_content.splitlines():
+                    if line.startswith("Prompt:"):
+                        prompt = line[len("Prompt:") :].strip()
+                    elif line.startswith("Response:"):
+                        response = line[len("Response:") :].strip()
+                    elif line.startswith("Source:"):
+                        source = line[len("Source:") :].strip()
+
+            # Get parent commit (previous commit in history)
+            # commit_history is sorted from oldest to newest due to --reverse flag
+            # So head_commit is the last element, and its parent is the second-to-last
+            parent_commit = ""
+            commit_history = GitManager.get_commit_history(self.bare_repo_path, head_commit)
+            if len(commit_history) > 1:
+                parent_commit = commit_history[-2]  # Second-to-last commit is the parent
+
+            # Get diff output using git show
+            diff_output = GitManager.git_show(
+                self.bare_repo_path, head_commit, return_output=True
+            )
+
+            # Get tracked files in this commit
+            tracked_files, _ = GitManager.get_files_by_commit(self.bare_repo_path, head_commit)
+
+            # Build report
+            report_data = {
+                "commit_hash": head_commit,
+                "commit_message": prompt if prompt else commit_message.splitlines()[0],
+                "diff": diff_output,
+                "branch": current_branch,
+                "parent_commit": parent_commit,
+                "metadata": {
+                    "prompt": prompt,
+                    "response": response,
+                    "source": source,
+                    "files": tracked_files,
+                    "full_commit_message": commit_message,
+                },
+            }
+
+            return report_data
+
+        except Exception as e:
+            LOGGER.error(f"Error generating report: {e}")
+            traceback.print_exc()
+            return None

@@ -286,14 +286,27 @@ class GitManager:
         return commit_hash
 
     @staticmethod
-    def git_show(bare_repo: str, commit_id: str) -> None:
-        """Show details of a specific snapshot in the memov bare repo, similar to git show."""
+    def git_show(bare_repo: str, commit_id: str, return_output: bool = False) -> Optional[str]:
+        """Show details of a specific snapshot in the memov bare repo, similar to git show.
+
+        Args:
+            bare_repo: Path to the bare git repository
+            commit_id: Commit hash to show
+            return_output: If True, return the output as a string instead of printing
+
+        Returns:
+            If return_output is True, returns the git show output as a string, otherwise None
+        """
         command = ["git", f"--git-dir={bare_repo}", "show", commit_id]
         success, output = subprocess_call(command=command)
 
-        sys.stdout.write(output.stdout)
-        if output.stderr:
-            sys.stderr.write(output.stderr)
+        if return_output:
+            return output.stdout if success else ""
+        else:
+            sys.stdout.write(output.stdout)
+            if output.stderr:
+                sys.stderr.write(output.stderr)
+            return None
 
     @staticmethod
     def get_commit_history(bare_repo: str, tip: str) -> list[str]:
