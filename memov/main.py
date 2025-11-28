@@ -263,6 +263,19 @@ def sync(loc: LocOption = ".") -> None:
     """
     manager = get_manager(loc)
 
+    # Check if RAG mode is available
+    if not manager.is_rag_available():
+        console.print(
+            "[red]✗ RAG mode is not available[/red]\n\n"
+            "[yellow]This command requires ChromaDB dependencies.[/yellow]\n"
+            "Install with:\n"
+            "  [cyan]pip install memov[rag][/cyan]\n"
+            "or\n"
+            "  [cyan]uv pip install memov[rag][/cyan]\n\n"
+            "[dim]Note: Use the basic mode binary if you don't need semantic search.[/dim]"
+        )
+        sys.exit(1)
+
     # Check pending writes count
     pending_count = manager.get_pending_writes_count()
 
@@ -339,6 +352,19 @@ def search(
         mem search "database" --limit 5 --show-distance
     """
     manager = get_manager(loc)
+
+    # Check if RAG mode is available
+    if not manager.is_rag_available():
+        console.print(
+            "[red]✗ RAG mode is not available[/red]\n\n"
+            "[yellow]This command requires ChromaDB dependencies.[/yellow]\n"
+            "Install with:\n"
+            "  [cyan]pip install memov[rag][/cyan]\n"
+            "or\n"
+            "  [cyan]uv pip install memov[rag][/cyan]\n\n"
+            "[dim]Note: Use the basic mode binary if you don't need semantic search.[/dim]"
+        )
+        sys.exit(1)
 
     try:
         if by_files:

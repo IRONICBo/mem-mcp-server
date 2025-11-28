@@ -12,12 +12,17 @@ dependencies = [
     "starlette>=0.47.2",
     "typer>=0.16.0",
     "uvicorn>=0.35.0",
-    "chromadb>=0.5.0",
     "rich>=13.0.0",
-    "litellm>=1.0.0",
 ]
 
 [project.optional-dependencies]
+# RAG mode: Semantic search with VectorDB (sync, search commands)
+rag = [
+    "chromadb>=0.5.0",
+    "litellm>=1.0.0",
+    "numpy>=1.26.0,<2.0.0",  # Pin to 1.26.x for PyInstaller macOS compatibility
+]
+
 # Optional: Lightweight embedding backends (install manually if needed)
 # Note: onnxruntime requires macOS 13+ on Apple Silicon
 # Install with: uv pip install onnxruntime  (for fastembed backend)
