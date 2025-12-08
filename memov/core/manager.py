@@ -13,6 +13,7 @@ from typing import Optional
 import pathspec
 
 from memov.core.git import GitManager
+from memov.storage import CHROMADB_AVAILABLE
 from memov.storage.vectordb import VectorDB
 from memov.utils.print_utils import Color
 from memov.utils.string_utils import short_msg
@@ -58,9 +59,23 @@ class MemovManager:
         # Load from disk if exists (to persist across CLI command invocations)
         self._pending_writes: list[dict] = self._load_pending_writes()
 
+    def is_rag_available(self) -> bool:
+        """Check if RAG mode (ChromaDB) is available."""
+        return CHROMADB_AVAILABLE
+
     @property
     def vectordb(self) -> VectorDB:
-        """Get or initialize the VectorDB instance."""
+        """Get or initialize the VectorDB instance.
+
+        Raises:
+            ImportError: If RAG mode dependencies are not installed.
+        """
+        if not self.is_rag_available():
+            raise ImportError(
+                "RAG mode is not available. ChromaDB dependencies are not installed.\n"
+                "Install with: pip install memov[rag] or uv pip install memov[rag]"
+            )
+
         if self._vectordb is None:
             # Use lightweight default embedding (no heavy dependencies)
             # To use other backends, set MEMOV_EMBEDDING_BACKEND environment variable:

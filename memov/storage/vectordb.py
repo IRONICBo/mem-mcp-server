@@ -5,9 +5,18 @@ import os
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-import chromadb
-from chromadb.config import Settings
-from chromadb.utils import embedding_functions
+# Conditional import for RAG mode
+try:
+    import chromadb
+    from chromadb.config import Settings
+    from chromadb.utils import embedding_functions
+
+    CHROMADB_AVAILABLE = True
+except ImportError:
+    CHROMADB_AVAILABLE = False
+    chromadb = None  # type: ignore
+    Settings = None  # type: ignore
+    embedding_functions = None  # type: ignore
 
 from .chunker import TextChunker
 
@@ -41,6 +50,14 @@ class VectorDB:
             embedding_model: Optional model name override
             openai_api_key: OpenAI API key (required if backend="openai")
         """
+        if not CHROMADB_AVAILABLE:
+            raise ImportError(
+                "ChromaDB is not available. Install RAG mode dependencies with:\n"
+                "  pip install memov[rag]\n"
+                "or\n"
+                "  uv pip install memov[rag]"
+            )
+
         self.persist_directory = Path(persist_directory)
         self.persist_directory.mkdir(parents=True, exist_ok=True)
         self.collection_name = collection_name
