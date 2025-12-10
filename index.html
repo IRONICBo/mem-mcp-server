@@ -1,26 +1,31 @@
 <!DOCTYPE html>
 <html>
-<head><title>MEM Package Repository</title></head>
+<head>
+  <title>MEM MCP Package Repository</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 800px; margin: 50px auto; padding: 20px; }
+    pre { background: #f4f4f4; padding: 15px; border-radius: 5px; overflow-x: auto; }
+    code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; }
+    h2 { margin-top: 30px; border-bottom: 1px solid #eee; padding-bottom: 10px; }
+  </style>
+</head>
 <body>
-  <h1>MEM Package Repository</h1>
+  <h1>MEM MCP Package Repository</h1>
+  <p>AI-powered version control tool - memory layer for AI coding agents</p>
 
   <h2>Homebrew (macOS/Linux)</h2>
-  <pre>
-brew tap IRONICBo/mem https://IRONICBo.github.io/mem-mcp-server/homebrew
-brew install mem
-  </pre>
+  <pre>brew install --formula https://IRONICBo.github.io/mem-mcp-server/homebrew/Formula/mem-mcp.rb</pre>
 
   <h2>APT (Debian/Ubuntu)</h2>
-  <pre>
-echo "deb [trusted=yes] https://IRONICBo.github.io/mem-mcp-server/apt stable main" | sudo tee /etc/apt/sources.list.d/mem.list
+  <pre>echo "deb [trusted=yes] https://IRONICBo.github.io/mem-mcp-server/apt stable main" | sudo tee /etc/apt/sources.list.d/mem.list
 sudo apt update
-sudo apt install mem
-  </pre>
+sudo apt install mem</pre>
 
   <h2>YUM/DNF (Fedora/RHEL)</h2>
-  <pre>
-sudo curl -o /etc/yum.repos.d/mem.repo https://IRONICBo.github.io/mem-mcp-server/yum/mem.repo
-sudo dnf install mem
-  </pre>
+  <pre>sudo curl -o /etc/yum.repos.d/mem.repo https://IRONICBo.github.io/mem-mcp-server/yum/mem.repo
+sudo dnf install mem</pre>
+
+  <h2>Direct Download</h2>
+  <p>Download binaries from <a href="https://github.com/IRONICBo/mem-mcp-server/releases">GitHub Releases</a></p>
 </body>
 </html>
