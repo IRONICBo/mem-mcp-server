@@ -1,0 +1,168 @@
+name: Release to Homebrew
+
+on:
+  workflow_run:
+    workflows: ["Build Binary Releases"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 0.0.1)'
+        required: true
+
+env:
+  HOMEBREW_TAP_REPO: memovai/homebrew-mem
+
+jobs:
+  update-homebrew-formula:
+    name: Update Homebrew Formula
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source repo
+        uses: actions/checkout@v4
+
+      - name: Check workflow run status
+        if: github.event_name == 'workflow_run'
+        run: |
+          if [ "${{ github.event.workflow_run.conclusion }}" != "success" ]; then
+            echo "Build workflow failed, skipping release"
+            exit 1
+          fi
+
+      - name: Get version
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            # Get latest release version
+            VERSION=$(gh release list --repo "${{ github.repository }}" --limit 1 --json tagName -q '.[0].tagName')
+            VERSION="${VERSION#v}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
+
+      - name: Download release assets and calculate SHA256
+        id: checksums
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          REPO="${{ github.repository }}"
+
+          # Download macOS Intel
+          gh release download "v${VERSION}" --repo "${REPO}" --pattern "mem-macos-x86_64.tar.gz"
+          MACOS_INTEL_SHA=$(sha256sum mem-macos-x86_64.tar.gz | cut -d' ' -f1)
+          echo "macos_intel_sha=$MACOS_INTEL_SHA" >> $GITHUB_OUTPUT
+
+          # Download macOS ARM
+          gh release download "v${VERSION}" --repo "${REPO}" --pattern "mem-macos-arm64.tar.gz"
+          MACOS_ARM_SHA=$(sha256sum mem-macos-arm64.tar.gz | cut -d' ' -f1)
+          echo "macos_arm_sha=$MACOS_ARM_SHA" >> $GITHUB_OUTPUT
+
+          # Download Linux x86_64
+          gh release download "v${VERSION}" --repo "${REPO}" --pattern "mem-linux-x86_64.tar.gz"
+          LINUX_X64_SHA=$(sha256sum mem-linux-x86_64.tar.gz | cut -d' ' -f1)
+          echo "linux_x64_sha=$LINUX_X64_SHA" >> $GITHUB_OUTPUT
+
+          echo "SHA256 checksums:"
+          echo "  macOS Intel: $MACOS_INTEL_SHA"
+          echo "  macOS ARM:   $MACOS_ARM_SHA"
+          echo "  Linux x64:   $LINUX_X64_SHA"
+
+      - name: Generate Homebrew Formula
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          REPO: ${{ github.repository }}
+          MACOS_INTEL_SHA: ${{ steps.checksums.outputs.macos_intel_sha }}
+          MACOS_ARM_SHA: ${{ steps.checksums.outputs.macos_arm_sha }}
+          LINUX_X64_SHA: ${{ steps.checksums.outputs.linux_x64_sha }}
+        run: |
+          mkdir -p Formula
+          cat > Formula/memov.rb << FORMULA_EOF
+          # typed: false
+          # frozen_string_literal: true
+
+          class Memov < Formula
+            desc "AI-powered version control tool - memory layer for AI coding agents"
+            homepage "https://github.com/${REPO}"
+            version "${VERSION}"
+            license "MIT"
+
+            on_macos do
+              if Hardware::CPU.intel?
+                url "https://github.com/${REPO}/releases/download/v${VERSION}/mem-macos-x86_64.tar.gz"
+                sha256 "${MACOS_INTEL_SHA}"
+              end
+              if Hardware::CPU.arm?
+                url "https://github.com/${REPO}/releases/download/v${VERSION}/mem-macos-arm64.tar.gz"
+                sha256 "${MACOS_ARM_SHA}"
+              end
+            end
+
+            on_linux do
+              if Hardware::CPU.intel? && Hardware::CPU.is_64_bit?
+                url "https://github.com/${REPO}/releases/download/v${VERSION}/mem-linux-x86_64.tar.gz"
+                sha256 "${LINUX_X64_SHA}"
+              end
+            end
+
+            def install
+              if OS.mac?
+                if Hardware::CPU.intel?
+                  bin.install "mem-macos-x86_64" => "mem"
+                else
+                  bin.install "mem-macos-arm64" => "mem"
+                end
+              else
+                bin.install "mem-linux-x86_64" => "mem"
+              end
+            end
+
+            test do
+              system "\#{bin}/mem", "--help"
+            end
+          end
+          FORMULA_EOF
+
+      - name: Upload Formula artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: homebrew-formula
+          path: Formula/
+          retention-days: 7
+
+      - name: Setup SSH for Deploy Key
+        env:
+          HOMEBREW_DEPLOY_KEY: ${{ secrets.HOMEBREW_DEPLOY_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$HOMEBREW_DEPLOY_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan github.com >> ~/.ssh/known_hosts
+
+      - name: Clone and update Homebrew tap repo
+        run: |
+          GIT_SSH_COMMAND="ssh -i ~/.ssh/deploy_key" git clone git@github.com:${{ env.HOMEBREW_TAP_REPO }}.git homebrew-tap
+
+          mkdir -p homebrew-tap/Formula
+          cp Formula/*.rb homebrew-tap/Formula/
+
+          cd homebrew-tap
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add Formula/
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Update memov formula to ${{ steps.version.outputs.version }}"
+            GIT_SSH_COMMAND="ssh -i ~/.ssh/deploy_key" git push
+          fi
+
+      - name: Cleanup SSH key
+        if: always()
+        run: |
+          rm -f ~/.ssh/deploy_key

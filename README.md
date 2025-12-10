@@ -66,7 +66,101 @@ While OpenAI's Aardvark operates at the git commit level, **MemoV captures conte
 See [MEMOV_VS_AARDVARK.md](docs/MEMOV_VS_AARDVARK.md) for comprehensive comparison.
 
 
-## Installation
+## Quick Start
+
+### One-Line Install (Recommended)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/memovai/memov/main/install.sh | bash
+```
+
+Or with wget:
+
+```bash
+wget -qO- https://raw.githubusercontent.com/memovai/memov/main/install.sh | bash
+```
+
+### Package Managers
+
+<details>
+<summary><b>Homebrew (macOS/Linux)</b></summary>
+
+```bash
+brew tap memovai/mem
+brew install memov
+```
+
+</details>
+
+<details>
+<summary><b>APT (Debian/Ubuntu)</b></summary>
+
+```bash
+echo "deb [trusted=yes] https://memovai.github.io/memov/apt stable main" | sudo tee /etc/apt/sources.list.d/mem.list
+sudo apt update
+sudo apt install mem
+```
+
+</details>
+
+<details>
+<summary><b>YUM/DNF (Fedora/RHEL/CentOS)</b></summary>
+
+```bash
+sudo curl -o /etc/yum.repos.d/mem.repo https://memovai.github.io/memov/yum/mem.repo
+sudo dnf install mem
+```
+
+</details>
+
+<details>
+<summary><b>Direct Download</b></summary>
+
+Download the latest release for your platform:
+
+| Platform | Download |
+|----------|----------|
+| Linux x86_64 | [mem-linux-x86_64.tar.gz](https://github.com/memovai/memov/releases/latest/download/mem-linux-x86_64.tar.gz) |
+| macOS Intel | [mem-macos-x86_64.tar.gz](https://github.com/memovai/memov/releases/latest/download/mem-macos-x86_64.tar.gz) |
+| macOS Apple Silicon | [mem-macos-arm64.tar.gz](https://github.com/memovai/memov/releases/latest/download/mem-macos-arm64.tar.gz) |
+| Windows | [mem-windows-x86_64.exe.zip](https://github.com/memovai/memov/releases/latest/download/mem-windows-x86_64.exe.zip) |
+
+```bash
+# Example for Linux
+tar -xzf mem-linux-x86_64.tar.gz
+sudo mv mem-linux-x86_64 /usr/local/bin/mem
+mem --help
+```
+
+</details>
+
+<details>
+<summary><b>From Source</b></summary>
+
+Requires Python 3.10+ and [uv](https://github.com/astral-sh/uv):
+
+```bash
+# Clone the repository
+git clone https://github.com/memovai/memov.git
+cd memov
+
+# Install with uv
+uv sync
+uv pip install -e .
+
+# Verify installation
+mem --help
+```
+
+</details>
+
+### Verify Installation
+
+```bash
+mem --help
+```
+
+## Detailed Installation
 
 Please see [docs/installation.md](docs/installation.md) for detailed installation instructions.
 
