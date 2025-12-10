@@ -1,0 +1,171 @@
+name: Release to YUM Repository
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 0.0.1-test)'
+        required: true
+
+env:
+  PAGES_BRANCH: gh-pages
+
+jobs:
+  build-rpm:
+    name: Build RPM packages
+    runs-on: ubuntu-latest
+    container: fedora:latest
+    strategy:
+      matrix:
+        mode: [basic, rag]
+        arch: [x86_64]
+    steps:
+      - name: Install dependencies
+        run: |
+          dnf install -y rpm-build createrepo_c curl tar gzip
+
+      - name: Get version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${{ github.event.release.tag_name }}"
+            VERSION="${VERSION#v}"
+          fi
+          # RPM version cannot contain hyphens
+          RPM_VERSION=$(echo "$VERSION" | tr '-' '.')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "rpm_version=$RPM_VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION, RPM Version: $RPM_VERSION"
+
+      - name: Download release binary
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          MODE="${{ matrix.mode }}"
+          REPO="${{ github.repository }}"
+
+          curl -sL "https://github.com/${REPO}/releases/download/v${VERSION}/mem-${MODE}-linux-x86_64.tar.gz" -o mem.tar.gz
+          tar -xzf mem.tar.gz
+          chmod +x mem-${MODE}-linux-x86_64
+
+      - name: Build RPM package
+        run: |
+          VERSION="${{ steps.version.outputs.rpm_version }}"
+          MODE="${{ matrix.mode }}"
+          ARCH="${{ matrix.arch }}"
+          PKG_NAME="mem"
+          if [ "$MODE" = "rag" ]; then
+            PKG_NAME="mem-rag"
+          fi
+
+          mkdir -p ~/rpmbuild/{SPECS,SOURCES,BUILD,RPMS,SRPMS}
+          cp "mem-${MODE}-linux-x86_64" ~/rpmbuild/SOURCES/mem
+
+          if [ "$MODE" = "basic" ]; then
+            SUMMARY="AI-powered version control tool"
+            DESCRIPTION="Memory layer for AI coding agents"
+          else
+            SUMMARY="AI-powered version control tool with RAG"
+            DESCRIPTION="Memory layer for AI coding agents with RAG support"
+          fi
+
+          cat > ~/rpmbuild/SPECS/${PKG_NAME}.spec << EOF
+          Name:           ${PKG_NAME}
+          Version:        ${VERSION}
+          Release:        1%{?dist}
+          Summary:        ${SUMMARY}
+          License:        MIT
+          URL:            https://github.com/${{ github.repository }}
+
+          %description
+          ${DESCRIPTION}
+
+          %install
+          mkdir -p %{buildroot}/usr/bin
+          cp %{_sourcedir}/mem %{buildroot}/usr/bin/mem
+          chmod 755 %{buildroot}/usr/bin/mem
+
+          %files
+          /usr/bin/mem
+          EOF
+
+          rpmbuild -bb ~/rpmbuild/SPECS/${PKG_NAME}.spec
+          cp ~/rpmbuild/RPMS/${ARCH}/*.rpm .
+
+      - name: Upload RPM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rpm-${{ matrix.mode }}-${{ matrix.arch }}
+          path: "*.rpm"
+          retention-days: 7
+
+  publish-yum-repo:
+    name: Publish YUM Repository
+    needs: build-rpm
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install createrepo
+        run: sudo apt-get update && sudo apt-get install -y createrepo-c
+
+      - name: Download all RPM artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: rpm-*
+          path: rpms/
+          merge-multiple: true
+
+      - name: Checkout gh-pages branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.PAGES_BRANCH }}
+          path: gh-pages
+        continue-on-error: true
+
+      - name: Initialize gh-pages if not exists
+        run: |
+          if [ ! -d "gh-pages/.git" ]; then
+            mkdir -p gh-pages
+            cd gh-pages
+            git init
+            git checkout -b ${{ env.PAGES_BRANCH }}
+          fi
+
+      - name: Setup YUM repository structure
+        run: |
+          mkdir -p gh-pages/yum/packages
+          cp rpms/*.rpm gh-pages/yum/packages/
+
+      - name: Generate YUM repository metadata
+        run: |
+          cd gh-pages/yum
+          createrepo_c .
+
+      - name: Create repo config file
+        run: |
+          PAGES_URL="${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
+          cat > gh-pages/yum/mem.repo << EOF
+          [mem]
+          name=MEM Repository
+          baseurl=https://${PAGES_URL}/yum
+          enabled=1
+          gpgcheck=0
+          EOF
+
+      - name: Commit and push
+        run: |
+          cd gh-pages
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Update YUM repository"
+            git push origin ${{ env.PAGES_BRANCH }} --force
+          fi
