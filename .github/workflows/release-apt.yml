@@ -1,0 +1,298 @@
+name: Release to APT Repository
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 0.0.1)'
+        required: true
+
+env:
+  APT_REPO_BRANCH: apt-repo
+  GPG_KEY_ID: ${{ secrets.GPG_KEY_ID }}
+  GITHUB_PAGES_URL: ${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}
+
+jobs:
+  build-deb:
+    name: Build DEB packages
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        mode: [basic, rag]
+        arch: [amd64]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Get version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${{ github.event.release.tag_name }}"
+            VERSION="${VERSION#v}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
+
+      - name: Download release binary
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          MODE="${{ matrix.mode }}"
+          REPO="${{ github.repository }}"
+
+          # Download the binary
+          curl -sL "https://github.com/${REPO}/releases/download/v${VERSION}/mem-${MODE}-linux-x86_64.tar.gz" -o mem.tar.gz
+          tar -xzf mem.tar.gz
+          chmod +x mem-${MODE}-linux-x86_64
+
+      - name: Build DEB package
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          MODE="${{ matrix.mode }}"
+          ARCH="${{ matrix.arch }}"
+          PKG_NAME="mem"
+          if [ "$MODE" = "rag" ]; then
+            PKG_NAME="mem-rag"
+          fi
+
+          # Create package directory structure
+          PKG_DIR="${PKG_NAME}_${VERSION}_${ARCH}"
+          mkdir -p "${PKG_DIR}/DEBIAN"
+          mkdir -p "${PKG_DIR}/usr/bin"
+          mkdir -p "${PKG_DIR}/usr/share/doc/${PKG_NAME}"
+          mkdir -p "${PKG_DIR}/usr/share/man/man1"
+
+          # Copy binary
+          cp "mem-${MODE}-linux-x86_64" "${PKG_DIR}/usr/bin/mem"
+          chmod 755 "${PKG_DIR}/usr/bin/mem"
+
+          # Create control file
+          if [ "$MODE" = "basic" ]; then
+            DESCRIPTION="AI-powered version control tool - memory layer for AI coding agents"
+            CONFLICTS=""
+          else
+            DESCRIPTION="AI-powered version control tool with RAG support - full-featured build"
+            CONFLICTS="Conflicts: mem"
+          fi
+
+          cat > "${PKG_DIR}/DEBIAN/control" << EOF
+          Package: ${PKG_NAME}
+          Version: ${VERSION}
+          Section: devel
+          Priority: optional
+          Architecture: ${ARCH}
+          Maintainer: Memov Team <contact@memov.dev>
+          Homepage: https://github.com/${{ github.repository }}
+          Description: ${DESCRIPTION}
+           mem is an AI-powered version control tool that provides a memory layer
+           for AI coding agents. It automatically captures every user interaction
+           (prompts, responses, agent plans) and code changes.
+          ${CONFLICTS}
+          EOF
+
+          # Create copyright file
+          cat > "${PKG_DIR}/usr/share/doc/${PKG_NAME}/copyright" << EOF
+          Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+          Upstream-Name: mem
+          Upstream-Contact: Memov Team <contact@memov.dev>
+          Source: https://github.com/${{ github.repository }}
+
+          Files: *
+          Copyright: 2024 Memov Team
+          License: MIT
+
+          License: MIT
+           Permission is hereby granted, free of charge, to any person obtaining a copy
+           of this software and associated documentation files (the "Software"), to deal
+           in the Software without restriction, including without limitation the rights
+           to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+           copies of the Software, and to permit persons to whom the Software is
+           furnished to do so, subject to the following conditions:
+
+           The above copyright notice and this permission notice shall be included in all
+           copies or substantial portions of the Software.
+
+           THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+           IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+           FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+           AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+           LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+           OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+           SOFTWARE.
+          EOF
+
+          # Create changelog
+          cat > "${PKG_DIR}/usr/share/doc/${PKG_NAME}/changelog.Debian" << EOF
+          ${PKG_NAME} (${VERSION}) stable; urgency=medium
+
+            * Release version ${VERSION}
+
+           -- Memov Team <contact@memov.dev>  $(date -R)
+          EOF
+          gzip -9 "${PKG_DIR}/usr/share/doc/${PKG_NAME}/changelog.Debian"
+
+          # Build package
+          dpkg-deb --build "${PKG_DIR}"
+
+          # Verify package
+          dpkg-deb --info "${PKG_DIR}.deb"
+
+      - name: Upload DEB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: deb-${{ matrix.mode }}-${{ matrix.arch }}
+          path: "*.deb"
+          retention-days: 7
+
+  publish-apt-repo:
+    name: Publish APT Repository
+    needs: build-deb
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all DEB artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: deb-*
+          path: debs/
+          merge-multiple: true
+
+      - name: List downloaded packages
+        run: |
+          echo "Downloaded packages:"
+          find debs/ -name "*.deb" -type f
+
+      - name: Setup GPG
+        if: env.GPG_KEY_ID != ''
+        run: |
+          echo "${{ secrets.GPG_PRIVATE_KEY }}" | gpg --batch --import
+          echo "GPG key imported successfully"
+
+      - name: Checkout APT repo branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.APT_REPO_BRANCH }}
+          path: apt-repo
+        continue-on-error: true
+
+      - name: Initialize APT repo if not exists
+        run: |
+          if [ ! -d "apt-repo" ]; then
+            mkdir -p apt-repo
+            cd apt-repo
+            git init
+            git checkout -b ${{ env.APT_REPO_BRANCH }}
+          fi
+
+          mkdir -p apt-repo/pool/main/m/mem
+          mkdir -p apt-repo/dists/stable/main/binary-amd64
+
+      - name: Copy packages to pool
+        run: |
+          cp debs/*.deb apt-repo/pool/main/m/mem/
+
+      - name: Generate APT repository metadata
+        run: |
+          cd apt-repo
+
+          # Generate Packages file
+          apt-ftparchive packages pool/main > dists/stable/main/binary-amd64/Packages
+          gzip -k -f dists/stable/main/binary-amd64/Packages
+          xz -k -f dists/stable/main/binary-amd64/Packages
+
+          # Generate Release file
+          cat > dists/stable/Release << EOF
+          Origin: MEM
+          Label: MEM
+          Suite: stable
+          Codename: stable
+          Architectures: amd64
+          Components: main
+          Description: MEM APT Repository
+          EOF
+
+          # Add checksums to Release
+          apt-ftparchive release dists/stable >> dists/stable/Release
+
+      - name: Sign repository
+        if: env.GPG_KEY_ID != ''
+        run: |
+          cd apt-repo/dists/stable
+
+          # Sign Release file
+          gpg --batch --yes --armor --detach-sign -o Release.gpg Release
+          gpg --batch --yes --clearsign -o InRelease Release
+
+          # Export public key
+          gpg --armor --export "${{ secrets.GPG_KEY_ID }}" > ../../mem.gpg.key
+
+      - name: Create repository index
+        run: |
+          cat > apt-repo/index.html << 'EOF'
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <title>MEM APT Repository</title>
+            <style>
+              body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+              code { background: #f4f4f4; padding: 2px 6px; border-radius: 3px; }
+              pre { background: #f4f4f4; padding: 15px; border-radius: 5px; overflow-x: auto; }
+            </style>
+          </head>
+          <body>
+            <h1>MEM APT Repository</h1>
+            <p>This repository hosts Debian/Ubuntu packages for MEM.</p>
+
+            <h2>Installation</h2>
+            <pre>
+          # Add GPG key
+          curl -fsSL https://${{ env.GITHUB_PAGES_URL }}/mem.gpg.key | sudo gpg --dearmor -o /usr/share/keyrings/mem.gpg
+
+          # Add repository
+          echo "deb [signed-by=/usr/share/keyrings/mem.gpg] https://${{ env.GITHUB_PAGES_URL }} stable main" | sudo tee /etc/apt/sources.list.d/mem.list
+
+          # Update and install
+          sudo apt update
+          sudo apt install mem        # Basic version
+          # OR
+          sudo apt install mem-rag    # RAG version (larger, with semantic search)
+            </pre>
+
+            <h2>Available Packages</h2>
+            <ul>
+              <li><strong>mem</strong> - Basic version with core features</li>
+              <li><strong>mem-rag</strong> - Full version with RAG/semantic search support</li>
+            </ul>
+          </body>
+          </html>
+          EOF
+
+      - name: Commit and push APT repo
+        run: |
+          cd apt-repo
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add -A
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Update APT repository with new packages"
+            git push origin ${{ env.APT_REPO_BRANCH }} --force
+          fi
+
+      - name: Upload Release Assets
+        uses: softprops/action-gh-release@v1
+        if: github.event_name == 'release'
+        with:
+          files: debs/*.deb
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
