@@ -1,0 +1,5 @@
+[mem]
+name=MEM Repository
+baseurl=https://IRONICBo.github.io/mem-mcp-server/yum
+enabled=1
+gpgcheck=0
