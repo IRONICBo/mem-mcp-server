@@ -13,3 +13,18 @@ SHA512: cf59fc58071347d8c51f1224fd2905fbdbd4ddff032c8cf495ff95e3003806f76f705e25
 Homepage: https://github.com/IRONICBo/mem-mcp-server
 Description: AI-powered version control tool - memory layer for AI coding agents
 
+Package: mem
+Architecture: amd64
+Version: 0.0.6
+Priority: optional
+Section: devel
+Maintainer: Memov Team <contact@memov.dev>
+Filename: pool/main/m/mem/mem_0.0.6_amd64.deb
+Size: 25128248
+MD5sum: d11cce23829c261b1d42ddbe063a68a3
+SHA1: 2a924f8715e5a9306dd27657a598636d7c42f588
+SHA256: f10e0266a0b275c8c9637b8dcef5a2cacd09c7ec05703663ec8f1dfc95790b0c
+SHA512: 92cbbef960fc9e3c012c38ba2b85d44d1322987e9d97aab9b57627574437d4ea905fe14b6af88dd45ecfb84cee2baf87094c37dd1a4661e8f79949fc471c6a55
+Homepage: https://github.com/IRONICBo/mem-mcp-server
+Description: AI-powered version control tool - memory layer for AI coding agents
+
