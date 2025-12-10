@@ -1,5 +1,5 @@
 """
-Unified MCP server launcher for Vit
+Unified MCP server launcher for Memov
 Supports both stdio and HTTP modes
 """
 
@@ -10,8 +10,8 @@ from typing import Annotated
 
 import typer
 
-from vit_mcp_server.globals import CONFIG_DIR
-from vit_mcp_server.server.mcp_server import VitMCPTools
+from mem_mcp_server.globals import CONFIG_DIR
+from mem_mcp_server.server.mcp_server import MemMCPTools
 
 # Set up logging
 logging.basicConfig(
@@ -54,7 +54,7 @@ def mcp_launcher(
     root_logger.handlers.clear()
     root_logger.addHandler(new_file_handler)
 
-    LOGGER.info(f"Starting Vit MCP Server")
+    LOGGER.info(f"Starting Memov MCP Server")
     LOGGER.info(f"Project: {os.path.abspath(project_path)}")
     LOGGER.info(f"Mode: {mode}")
 
@@ -63,8 +63,8 @@ def mcp_launcher(
         LOGGER.info(f"Usage: Configure Claude Desktop with this script path")
         LOGGER.info(f"")
 
-        vit_mcp_tools = VitMCPTools(project_path)
-        vit_mcp_tools.run()
+        mem_mcp_tools = MemMCPTools(project_path)
+        mem_mcp_tools.run()
 
     elif mode == "http":
         LOGGER.info(f"Protocol: HTTP")
@@ -72,8 +72,8 @@ def mcp_launcher(
         LOGGER.info(f"Health: http://{host}:{port}/health")
         LOGGER.info(f"")
 
-        vit_mcp_tools = VitMCPTools(project_path)
-        vit_mcp_tools.run(transport="streamable-http")
+        mem_mcp_tools = MemMCPTools(project_path)
+        mem_mcp_tools.run(transport="streamable-http")
 
 
 def main():

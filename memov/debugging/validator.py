@@ -13,8 +13,8 @@ import re
 from dataclasses import dataclass
 from typing import Any, Optional
 
-from vit.core.git import GitManager
-from vit.core.manager import VitManager
+from memov.core.git import GitManager
+from memov.core.manager import MemovManager
 
 LOGGER = logging.getLogger(__name__)
 
@@ -77,11 +77,11 @@ class ValidationResult:
 class DebugValidator:
     """Validator for debugging MCP operations."""
 
-    def __init__(self, vit_manager: VitManager):
-        """Initialize the validator with a VitManager instance."""
-        self.manager = vit_manager
-        self.bare_repo_path = vit_manager.bare_repo_path
-        self.project_path = vit_manager.project_path
+    def __init__(self, memov_manager: MemovManager):
+        """Initialize the validator with a MemovManager instance."""
+        self.manager = memov_manager
+        self.bare_repo_path = memov_manager.bare_repo_path
+        self.project_path = memov_manager.project_path
 
     def validate_commit(self, commit_hash: str) -> ValidationResult:
         """
@@ -192,7 +192,7 @@ class DebugValidator:
         """
         try:
             head_commit = GitManager.get_commit_id_by_ref(
-                self.bare_repo_path, "refs/vit/HEAD", verbose=False
+                self.bare_repo_path, "refs/memov/HEAD", verbose=False
             )
             if not head_commit:
                 LOGGER.warning("No HEAD commit found")

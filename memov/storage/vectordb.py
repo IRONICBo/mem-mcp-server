@@ -24,12 +24,12 @@ logger = logging.getLogger(__name__)
 
 
 class VectorDB:
-    """Vector database wrapper for vit using ChromaDB with lightweight embedding options."""
+    """Vector database wrapper for memov using ChromaDB with lightweight embedding options."""
 
     def __init__(
         self,
         persist_directory: Path,
-        collection_name: str = "vit_memories",
+        collection_name: str = "memov_memories",
         chunk_size: int = 768,
         embedding_backend: str = "default",
         embedding_model: Optional[str] = None,
@@ -53,9 +53,9 @@ class VectorDB:
         if not CHROMADB_AVAILABLE:
             raise ImportError(
                 "ChromaDB is not available. Install RAG mode dependencies with:\n"
-                "  pip install vit[rag]\n"
+                "  pip install memov[rag]\n"
                 "or\n"
-                "  uv pip install vit[rag]"
+                "  uv pip install memov[rag]"
             )
 
         self.persist_directory = Path(persist_directory)

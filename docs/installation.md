@@ -37,13 +37,13 @@
     ```json
     {
       "servers": {
-        "vit-mcp": {
+        "mem-mcp": {
           "type": "stdio",
           "command": "uvx",
           "args": [
             "--from",
             "git+https://github.com/memovai/memov.git",
-            "vit-mcp-launcher",
+            "mem-mcp-launcher",
             "stdio",
             "${workspaceFolder}"
           ]
@@ -58,13 +58,13 @@
     ```json
     {
       "mcpServers": {
-        "vit-mcp": {
+        "mem-mcp": {
           "type": "stdio",
           "command": "uvx",
           "args": [
             "--from",
             "git+https://github.com/memovai/memov.git",
-            "vit-mcp-launcher",
+            "mem-mcp-launcher",
             "stdio",
             "${workspaceFolder}"
           ]
@@ -77,5 +77,5 @@
     **Claude Code:** Run the following command in your terminal to add the MCP server:
     > Note: Make sure you are in your project root directory when running this command, like where your `.git` folder is located.
     ```bash
-    claude mcp add vit-mcp --scope project -- uvx --from git+https://github.com/memovai/memov.git vit-mcp-launcher stdio $(pwd)
+    claude mcp add mem-mcp --scope project -- uvx --from git+https://github.com/memovai/memov.git mem-mcp-launcher stdio $(pwd)
     ```

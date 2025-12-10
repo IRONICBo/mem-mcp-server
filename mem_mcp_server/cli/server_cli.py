@@ -1,5 +1,5 @@
 """
-Vit CLI - Command line interface for managing Vit MCP servers
+Mov CLI - Command line interface for managing Memov MCP servers
 """
 
 import datetime
@@ -13,11 +13,11 @@ from typing import Annotated, Any, Optional
 import psutil
 import typer
 
-from vit_mcp_server.globals import CONFIG_DIR
+from mem_mcp_server.globals import CONFIG_DIR
 
 
 class ServerCLI:
-    """CLI manager for Vit MCP servers"""
+    """CLI manager for Mem MCP servers"""
 
     def __init__(self):
         self.config_dir = CONFIG_DIR
@@ -73,7 +73,7 @@ class ServerCLI:
                 [
                     "uv",
                     "run",
-                    "vit-mcp-launcher",
+                    "mem-mcp-launcher",
                     "http",
                     str(workspace_path),
                     "--port",
@@ -104,7 +104,7 @@ class ServerCLI:
                 }
                 self.save_servers(alive_servers)
 
-                typer.echo(f"✅ Started Vit server")
+                typer.echo(f"✅ Started Mov server")
                 typer.echo(f"   📁 Workspace: {workspace_path}")
                 typer.echo(f"   🌐 URL: http://{host}:{port}/mcp")
                 typer.echo(f"   🏥 Health: http://{host}:{port}/health")
@@ -235,7 +235,7 @@ class ServerCLI:
             return servers
 
         if verbose:
-            typer.echo("🔄 Vit Server Status:")
+            typer.echo("🔄 Mov Server Status:")
             typer.echo("-" * 80)
 
         running_count = 0
@@ -289,7 +289,7 @@ class ServerCLI:
 
 
 app = typer.Typer(
-    help="Vit MCP Server Manager - Manage MCP servers for workspace monitoring",
+    help="Mem MCP Server Manager - Manage MCP servers for workspace monitoring",
     rich_markup_mode="rich",
 )
 cli = ServerCLI()

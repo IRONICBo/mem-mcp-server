@@ -12,9 +12,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from vit.core.git import GitManager
-from vit.core.manager import VitManager
-from vit.debugging.llm_client import LLMClient
+from memov.core.git import GitManager
+from memov.core.manager import MemovManager
+from memov.debugging.llm_client import LLMClient
 
 logger = logging.getLogger(__name__)
 
@@ -44,20 +44,20 @@ class RAGDebugger:
 
     def __init__(
         self,
-        vit_manager: VitManager,
+        memov_manager: MemovManager,
         llm_client: Optional[LLMClient] = None,
     ):
         """
         Initialize the RAG debugger.
 
         Args:
-            vit_manager: VitManager instance for accessing VectorDB
+            memov_manager: MemovManager instance for accessing VectorDB
             llm_client: LLMClient instance (optional, will create default if None)
         """
-        self.manager = vit_manager
-        self.vectordb = vit_manager.vectordb
-        self.bare_repo_path = vit_manager.bare_repo_path
-        self.project_path = vit_manager.project_path
+        self.manager = memov_manager
+        self.vectordb = memov_manager.vectordb
+        self.bare_repo_path = memov_manager.bare_repo_path
+        self.project_path = memov_manager.project_path
 
         # Initialize LLM client
         if llm_client:

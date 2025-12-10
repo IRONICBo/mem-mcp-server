@@ -1,7 +1,7 @@
 """
-Vit MCP Server - AI-assisted version control with automatic prompt recording
+Memov MCP Server - AI-assisted version control with automatic prompt recording
 
-This MCP server provides intelligent vit integration that automatically:
+This MCP server provides intelligent memov integration that automatically:
 - Records user prompts with file changes
 - Handles new files vs modified files appropriately
 - Provides seamless version control for AI-assisted development
@@ -18,17 +18,17 @@ from mcp.server.fastmcp import FastMCP
 from starlette.requests import Request
 from starlette.responses import PlainTextResponse
 
-from vit.core.manager import VitManager, VitStatus
-from vit.debugging import DebugValidator
-from vit.debugging.rag_debugger import RAGDebugger, DebugContext
-from vit.debugging.llm_client import LLMClient
+from memov.core.manager import MemovManager, MemStatus
+from memov.debugging import DebugValidator
+from memov.debugging.rag_debugger import RAGDebugger, DebugContext
+from memov.debugging.llm_client import LLMClient
 
 LOGGER = logging.getLogger(__name__)
 
 
-class VitMCPTools:
+class MemMCPTools:
     # Initialize FastMCP server
-    mcp = FastMCP("Vit MCP Server")
+    mcp = FastMCP("Memov MCP Server")
 
     # Global context storage for user prompts and working directory
     _project_path = None
@@ -42,21 +42,21 @@ class VitMCPTools:
     }
 
     def __init__(self, project_path: str) -> None:
-        VitMCPTools._project_path = project_path
+        MemMCPTools._project_path = project_path
 
     def run(self, *args, **kwargs) -> None:
         """
         Run the MCP tools server.
         """
-        LOGGER.info("Running VitMCPTools server...")
+        LOGGER.info("Running MemMCPTools server...")
         # Start the FastMCP server
-        VitMCPTools.mcp.run(*args, **kwargs)
+        MemMCPTools.mcp.run(*args, **kwargs)
 
     @mcp.custom_route("/health", methods=["GET"])
     async def health(_req: Request) -> PlainTextResponse:
         return PlainTextResponse("OK")
 
-    # Core MCP tools for intelligent vit integration
+    # Core MCP tools for intelligent memov integration
     @staticmethod
     @mcp.tool()
     def snap(
@@ -79,16 +79,16 @@ class VitMCPTools:
         - Read-only operations (viewing, searching) → Call with files_changed=""
 
         **When NOT to call:**
-        - After rename operations - `vit rename` already handles the recording
-        - After remove operations - `vit remove` already handles the recording
+        - After rename operations - `mem rename` already handles the recording
+        - After remove operations - `mem remove` already handles the recording
 
         **Intelligent Workflow:**
-        1. **Auto-initialize** - Creates vit repository if it doesn't exist
+        1. **Auto-initialize** - Creates memov repository if it doesn't exist
         2. **For interactions without file changes** - Records prompt and response only
         3. **For interactions with file changes:**
            - Status check - Analyzes current file states (untracked, modified, clean)
-           - New files → `vit track` (auto-commits with prompt)
-           - Modified files → `vit snap` (records changes with prompt)
+           - New files → `mem track` (auto-commits with prompt)
+           - Modified files → `mem snap` (records changes with prompt)
 
         Args:
             user_prompt: The user's exact original prompt/request
@@ -187,11 +187,11 @@ class VitMCPTools:
                 f"Using prompt: {user_prompt}, response: {original_response}, plan: {agent_plan}"
             )
 
-            if VitMCPTools._project_path is None:
+            if MemMCPTools._project_path is None:
                 raise ValueError(f"Project path is not set.")
 
-            if not os.path.exists(VitMCPTools._project_path):
-                raise ValueError(f"Project path '{VitMCPTools._project_path}' does not exist.")
+            if not os.path.exists(MemMCPTools._project_path):
+                raise ValueError(f"Project path '{MemMCPTools._project_path}' does not exist.")
 
             # Convert agent_plan list to formatted string for storage
             # Each plan step is stored on a separate line for better readability
@@ -200,16 +200,16 @@ class VitMCPTools:
                 agent_plan_str = "\n".join([f"{i+1}. {step}" for i, step in enumerate(agent_plan)])
 
             # Prepare the variables
-            vit_manager = VitManager(project_path=VitMCPTools._project_path)
+            memov_manager = MemovManager(project_path=MemMCPTools._project_path)
 
-            # Step 1: Check if Vit is initialized
-            if (check_status := vit_manager.check()) is VitStatus.SUCCESS:
-                LOGGER.info("Vit is initialized.")
+            # Step 1: Check if Memov is initialized
+            if (check_status := memov_manager.check()) is MemStatus.SUCCESS:
+                LOGGER.info("Memov is initialized.")
             else:
-                LOGGER.warning(f"Vit is not initialized, return {check_status}.")
-                if (init_status := vit_manager.init()) is not VitStatus.SUCCESS:
-                    LOGGER.error(f"Failed to initialize Vit: {init_status}")
-                    return f"[ERROR] Failed to initialize Vit: {init_status}"
+                LOGGER.warning(f"Memov is not initialized, return {check_status}.")
+                if (init_status := memov_manager.init()) is not MemStatus.SUCCESS:
+                    LOGGER.error(f"Failed to initialize Memov: {init_status}")
+                    return f"[ERROR] Failed to initialize Memov: {init_status}"
 
             # Step 2: Handle two cases - with or without file changes
             if not files_changed or files_changed.strip() == "":
@@ -237,8 +237,8 @@ class VitMCPTools:
                 LOGGER.info(f"Processing file changes: {files_changed}")
 
                 # Check file status
-                ret_status, current_file_status = vit_manager.status()
-                if ret_status is not VitStatus.SUCCESS:
+                ret_status, current_file_status = memov_manager.status()
+                if ret_status is not MemStatus.SUCCESS:
                     LOGGER.error(f"Failed to check file status: {ret_status}")
                     return f"[ERROR] Failed to check file status: {ret_status}"
 
@@ -247,12 +247,12 @@ class VitMCPTools:
                 for file_changed in files_changed.split(","):
                     file_changed = file_changed.strip()
                     if file_changed:
-                        file_path = Path(VitMCPTools._project_path) / file_changed
+                        file_path = Path(MemMCPTools._project_path) / file_changed
                         ai_changed_files.add(file_path.resolve())
 
                 # Detect manual edits: modified files that are NOT in AI-changed list
                 manual_edit_files = []
-                project_path_resolved = Path(VitMCPTools._project_path).resolve()
+                project_path_resolved = Path(MemMCPTools._project_path).resolve()
                 for modified_file in current_file_status["modified"]:
                     # modified_file is already a Path object with absolute path (resolved)
                     if modified_file.resolve() not in ai_changed_files:
@@ -268,14 +268,14 @@ class VitMCPTools:
                 # Step 1: Capture manual edits first (if any)
                 if manual_edit_files:
                     LOGGER.info(f"Detected manual edits: {manual_edit_files}")
-                    manual_snap_status = vit_manager.snapshot(
+                    manual_snap_status = memov_manager.snapshot(
                         file_paths=manual_edit_files,
                         prompt="Manual edits detected before AI operation",
                         response=f"User manually edited: {', '.join([Path(f).name for f in manual_edit_files])}",
                         agent_plan=None,  # No agent plan for manual edits
                         by_user=True,
                     )
-                    if manual_snap_status is not VitStatus.SUCCESS:
+                    if manual_snap_status is not MemStatus.SUCCESS:
                         LOGGER.error(f"Failed to snapshot manual edits: {manual_snap_status}")
                         return f"[ERROR] Failed to snapshot manual edits: {manual_snap_status}"
                     LOGGER.info(f"Captured manual edits in separate commit")
@@ -291,7 +291,7 @@ class VitMCPTools:
                     if not file_changed:
                         continue
 
-                    file_changed_Path = Path(VitMCPTools._project_path) / file_changed
+                    file_changed_Path = Path(MemMCPTools._project_path) / file_changed
 
                     # Check if file is untracked
                     is_untracked = False
@@ -310,27 +310,27 @@ class VitMCPTools:
                 # Track all untracked files at once
                 if files_to_track:
                     LOGGER.info(f"Tracking new files: {files_to_track}")
-                    track_status = vit_manager.track(
+                    track_status = memov_manager.track(
                         files_to_track,
                         prompt=user_prompt,
                         response=original_response,
                         by_user=False,
                     )
-                    if track_status is not VitStatus.SUCCESS:
+                    if track_status is not MemStatus.SUCCESS:
                         LOGGER.error(f"Failed to track files: {track_status}")
                         return f"[ERROR] Failed to track files: {track_status}"
 
                 # Snap all AI-modified files at once (fine-grained snapshot)
                 if files_to_snap:
                     LOGGER.info(f"Snapping AI-modified files: {files_to_snap}")
-                    snap_status = vit_manager.snapshot(
+                    snap_status = memov_manager.snapshot(
                         file_paths=files_to_snap,
                         prompt=user_prompt,
                         response=original_response,
                         agent_plan=agent_plan_str,
                         by_user=False,
                     )
-                    if snap_status is not VitStatus.SUCCESS:
+                    if snap_status is not MemStatus.SUCCESS:
                         LOGGER.error(f"Failed to snap files: {snap_status}")
                         return f"[ERROR] Failed to snap files: {snap_status}"
 
@@ -349,9 +349,9 @@ class VitMCPTools:
 
                 # Auto-sync to VectorDB after recording changes
                 LOGGER.info("Auto-syncing to VectorDB after snap...")
-                pending_count = vit_manager.get_pending_writes_count()
+                pending_count = memov_manager.get_pending_writes_count()
                 if pending_count > 0:
-                    successful, failed = vit_manager.sync_to_vectordb()
+                    successful, failed = memov_manager.sync_to_vectordb()
                     if failed == 0:
                         result += f"\n[AUTO-SYNC] Successfully synced {successful} operation(s) to VectorDB"
                     else:
@@ -401,21 +401,21 @@ class VitMCPTools:
         try:
             LOGGER.info(f"validate_commit called for: {commit_hash}")
 
-            if VitMCPTools._project_path is None:
+            if MemMCPTools._project_path is None:
                 raise ValueError("Project path is not set.")
 
-            if not os.path.exists(VitMCPTools._project_path):
-                raise ValueError(f"Project path '{VitMCPTools._project_path}' does not exist.")
+            if not os.path.exists(MemMCPTools._project_path):
+                raise ValueError(f"Project path '{MemMCPTools._project_path}' does not exist.")
 
             # Prepare the manager and validator
-            vit_manager = VitManager(project_path=VitMCPTools._project_path)
+            memov_manager = MemovManager(project_path=MemMCPTools._project_path)
 
-            # Check if vit is initialized
-            if (check_status := vit_manager.check()) is not VitStatus.SUCCESS:
-                return f"[ERROR] Vit not initialized: {check_status}. Run 'vit init' first."
+            # Check if memov is initialized
+            if (check_status := memov_manager.check()) is not MemStatus.SUCCESS:
+                return f"[ERROR] Memov not initialized: {check_status}. Run 'mem init' first."
 
             # Create validator
-            validator = DebugValidator(vit_manager)
+            validator = DebugValidator(memov_manager)
 
             # Validate the commit
             result = validator.validate_commit(commit_hash)
@@ -539,21 +539,21 @@ class VitMCPTools:
             # Limit to reasonable number
             n = min(max(1, n), 20)
 
-            if VitMCPTools._project_path is None:
+            if MemMCPTools._project_path is None:
                 raise ValueError("Project path is not set.")
 
-            if not os.path.exists(VitMCPTools._project_path):
-                raise ValueError(f"Project path '{VitMCPTools._project_path}' does not exist.")
+            if not os.path.exists(MemMCPTools._project_path):
+                raise ValueError(f"Project path '{MemMCPTools._project_path}' does not exist.")
 
             # Prepare the manager and validator
-            vit_manager = VitManager(project_path=VitMCPTools._project_path)
+            memov_manager = MemovManager(project_path=MemMCPTools._project_path)
 
-            # Check if vit is initialized
-            if (check_status := vit_manager.check()) is not VitStatus.SUCCESS:
-                return f"[ERROR] Vit not initialized: {check_status}. Run 'vit init' first."
+            # Check if memov is initialized
+            if (check_status := memov_manager.check()) is not MemStatus.SUCCESS:
+                return f"[ERROR] Memov not initialized: {check_status}. Run 'mem init' first."
 
             # Create validator
-            validator = DebugValidator(vit_manager)
+            validator = DebugValidator(memov_manager)
 
             # Validate recent commits
             results = validator.validate_recent_commits(n)
@@ -605,7 +605,7 @@ class VitMCPTools:
         5. Compares responses and extracts consensus recommendations
 
         **Requirements:**
-        - VectorDB must be populated (run `vit sync` first)
+        - VectorDB must be populated (run `mem sync` first)
         - LiteLLM installed: `pip install litellm`
         - API keys configured for desired models:
           - OPENAI_API_KEY for GPT models
@@ -648,24 +648,24 @@ class VitMCPTools:
         try:
             LOGGER.info(f"vibe_debug called with query: {query}")
 
-            if VitMCPTools._project_path is None:
+            if MemMCPTools._project_path is None:
                 raise ValueError("Project path is not set.")
 
-            if not os.path.exists(VitMCPTools._project_path):
-                raise ValueError(f"Project path '{VitMCPTools._project_path}' does not exist.")
+            if not os.path.exists(MemMCPTools._project_path):
+                raise ValueError(f"Project path '{MemMCPTools._project_path}' does not exist.")
 
             # Prepare the manager
-            vit_manager = VitManager(project_path=VitMCPTools._project_path)
+            memov_manager = MemovManager(project_path=MemMCPTools._project_path)
 
-            # Check if vit is initialized
-            if (check_status := vit_manager.check()) is not VitStatus.SUCCESS:
-                return f"[ERROR] Vit not initialized: {check_status}. Run 'vit init' first."
+            # Check if memov is initialized
+            if (check_status := memov_manager.check()) is not MemStatus.SUCCESS:
+                return f"[ERROR] Memov not initialized: {check_status}. Run 'mem init' first."
 
             # Check if VectorDB has data
-            db_info = vit_manager.get_vectordb_info()
+            db_info = memov_manager.get_vectordb_info()
             if db_info.get("count", 0) == 0:
                 return (
-                    "[ERROR] VectorDB is empty. Please run 'vit sync' first to populate "
+                    "[ERROR] VectorDB is empty. Please run 'mem sync' first to populate "
                     "the database with your code history."
                 )
 
@@ -686,7 +686,7 @@ class VitMCPTools:
                     "  export GEMINI_API_KEY=your_key"
                 )
 
-            debugger = RAGDebugger(vit_manager, llm_client)
+            debugger = RAGDebugger(memov_manager, llm_client)
 
             # Build debug context using RAG
             LOGGER.info("Building debug context with RAG...")
@@ -754,24 +754,24 @@ class VitMCPTools:
         try:
             LOGGER.info(f"vibe_search called with query: {query}")
 
-            if VitMCPTools._project_path is None:
+            if MemMCPTools._project_path is None:
                 raise ValueError("Project path is not set.")
 
-            if not os.path.exists(VitMCPTools._project_path):
-                raise ValueError(f"Project path '{VitMCPTools._project_path}' does not exist.")
+            if not os.path.exists(MemMCPTools._project_path):
+                raise ValueError(f"Project path '{MemMCPTools._project_path}' does not exist.")
 
             # Prepare the manager
-            vit_manager = VitManager(project_path=VitMCPTools._project_path)
+            memov_manager = MemovManager(project_path=MemMCPTools._project_path)
 
-            # Check if vit is initialized
-            if (check_status := vit_manager.check()) is not VitStatus.SUCCESS:
-                return f"[ERROR] Vit not initialized: {check_status}. Run 'vit init' first."
+            # Check if memov is initialized
+            if (check_status := memov_manager.check()) is not MemStatus.SUCCESS:
+                return f"[ERROR] Memov not initialized: {check_status}. Run 'mem init' first."
 
             # Limit results
             n_results = min(max(1, n_results), 20)
 
             # Search
-            debugger = RAGDebugger(vit_manager, llm_client=None)
+            debugger = RAGDebugger(memov_manager, llm_client=None)
 
             if content_type and content_type.strip():
                 content_types = [content_type.strip()]
@@ -835,8 +835,8 @@ def main():
     """Main entry point for the MCP server"""
     import asyncio
 
-    vit_mcp_tools = VitMCPTools("D:/Projects/temp")
-    asyncio.run(vit_mcp_tools.mcp.call_tool("snap", {"files_changed": "123.py"}))
+    mem_mcp_tools = MemMCPTools("D:/Projects/temp")
+    asyncio.run(mem_mcp_tools.mcp.call_tool("mem_snap", {"files_changed": "123.py"}))
 
 
 if __name__ == "__main__":

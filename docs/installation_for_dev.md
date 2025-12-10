@@ -38,20 +38,20 @@ The project provides two main entry points:
 
 | Command | Purpose | Module |
 |---------|---------|---------|
-| `vit-mcp-server` | Server management CLI | `vit_mcp_server.cli.server_cli:main` |
-| `vit-mcp-launcher` | Direct MCP runtime launcher | `vit_mcp_server.server.mcp_launcher:main` |
+| `mem-mcp-server` | Server management CLI | `mem_mcp_server.cli.server_cli:main` |
+| `mem-mcp-launcher` | Direct MCP runtime launcher | `mem_mcp_server.server.mcp_launcher:main` |
 
 **Run commands without global installation:**
 ```bash
-uv run vit-mcp-server --help
-uv run vit-mcp-launcher --help
+uv run mem-mcp-server --help
+uv run mem-mcp-launcher --help
 ```
 
 ## Configuration and Logs
 
-Default config directory: `~/.vit_mcp_server`
+Default config directory: `~/.mem_mcp_server`
 
 ```
-~/.vit_mcp_server/
+~/.mem_mcp_server/
 └── logs/           # Server log files
 ```

@@ -9,9 +9,9 @@ This standalone CLI tool allows you to:
 4. Get actionable recommendations
 
 Usage:
-    vit-debug search "authentication logic"
-    vit-debug analyze "Why is login failing?" --error "User not found"
-    vit-debug compare "How to fix memory leak?" --models gpt-4o,claude-3-5-sonnet-20241022
+    mem-debug search "authentication logic"
+    mem-debug analyze "Why is login failing?" --error "User not found"
+    mem-debug compare "How to fix memory leak?" --models gpt-4o,claude-3-5-sonnet-20241022
 """
 
 import logging
@@ -30,9 +30,9 @@ from rich.table import Table
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from vit.core.manager import VitManager, VitStatus
-from vit.debugging.llm_client import LLMClient
-from vit.debugging.rag_debugger import RAGDebugger
+from memov.core.manager import MemovManager, MemStatus
+from memov.debugging.llm_client import LLMClient
+from memov.debugging.rag_debugger import RAGDebugger
 
 # Setup logging
 logging.basicConfig(
@@ -46,7 +46,7 @@ console = Console()
 
 # Typer app
 app = typer.Typer(
-    name="vit-debug",
+    name="mem-debug",
     help="VIBE Debugging - RAG-based code debugging with multi-model LLM comparison",
     add_completion=False,
 )
@@ -60,23 +60,23 @@ def get_project_path() -> str:
 
 def check_setup(project_path: str) -> tuple[bool, str]:
     """
-    Check if Vit is properly set up.
+    Check if Memov is properly set up.
 
     Returns:
         Tuple of (success, error_message)
     """
     try:
-        manager = VitManager(project_path=project_path)
+        manager = MemovManager(project_path=project_path)
 
         # Check if initialized
         status = manager.check()
-        if status != VitStatus.SUCCESS:
-            return False, f"Vit not initialized. Run 'vit init' in your project directory."
+        if status != MemStatus.SUCCESS:
+            return False, f"Memov not initialized. Run 'mem init' in your project directory."
 
         # Check if VectorDB has data
         db_info = manager.get_vectordb_info()
         if db_info.get("count", 0) == 0:
-            return False, f"VectorDB is empty. Run 'vit sync' to populate the database."
+            return False, f"VectorDB is empty. Run 'mem sync' to populate the database."
 
         return True, ""
 
@@ -95,9 +95,9 @@ def search(
     Search code history using RAG (semantic search).
 
     Examples:
-        vit-debug search "authentication implementation"
-        vit-debug search "API error handling" --limit 10
-        vit-debug search "database setup" --type agent_plan
+        mem-debug search "authentication implementation"
+        mem-debug search "API error handling" --limit 10
+        mem-debug search "database setup" --type agent_plan
     """
     path = project_path or get_project_path()
 
@@ -115,7 +115,7 @@ def search(
         progress.add_task(description="Searching...", total=None)
 
         try:
-            manager = VitManager(project_path=path)
+            manager = MemovManager(project_path=path)
             debugger = RAGDebugger(manager, llm_client=None)
 
             # Search
@@ -180,9 +180,9 @@ def analyze(
     Analyze and debug issues using RAG + multi-model LLM comparison.
 
     Examples:
-        vit-debug analyze "Why is the API slow?"
-        vit-debug analyze "Login fails" --error "Invalid credentials"
-        vit-debug analyze "Memory leak" --models "gpt-4o,claude-3-5-sonnet-20241022"
+        mem-debug analyze "Why is the API slow?"
+        mem-debug analyze "Login fails" --error "Invalid credentials"
+        mem-debug analyze "Memory leak" --models "gpt-4o,claude-3-5-sonnet-20241022"
     """
     path = project_path or get_project_path()
 
@@ -215,7 +215,7 @@ def analyze(
         task1 = progress.add_task("[cyan]Building context with RAG...", total=None)
 
         try:
-            manager = VitManager(project_path=path)
+            manager = MemovManager(project_path=path)
 
             # Parse models
             model_list = None
@@ -328,8 +328,8 @@ def compare(
     responses for comparison. Useful for getting diverse perspectives.
 
     Examples:
-        vit-debug compare "How to optimize database queries?"
-        vit-debug compare "Best practices for error handling" --models gpt-4o,claude-3-opus-20240229
+        mem-debug compare "How to optimize database queries?"
+        mem-debug compare "Best practices for error handling" --models gpt-4o,claude-3-opus-20240229
     """
     path = project_path or get_project_path()
 
@@ -403,9 +403,9 @@ def setup():
     success, error = check_setup(path)
 
     if success:
-        console.print("[green]✓ Vit initialized[/green]")
+        console.print("[green]✓ Memov initialized[/green]")
 
-        manager = VitManager(project_path=path)
+        manager = MemovManager(project_path=path)
         db_info = manager.get_vectordb_info()
         console.print(f"[green]✓ VectorDB populated ({db_info.get('count', 0)} documents)[/green]")
     else:

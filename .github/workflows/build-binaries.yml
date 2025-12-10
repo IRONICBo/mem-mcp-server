@@ -23,22 +23,22 @@ jobs:
           - os: ubuntu-latest
             platform: linux
             arch: x86_64
-            artifact_name: vit
+            artifact_name: mem
           # macOS Intel builds
           - os: macos-latest
             platform: macos
             arch: x86_64
-            artifact_name: vit
+            artifact_name: mem
           # macOS ARM builds
           - os: macos-latest
             platform: macos
             arch: arm64
-            artifact_name: vit
+            artifact_name: mem
           # Windows builds
           - os: windows-latest
             platform: windows
             arch: x86_64
-            artifact_name: vit.exe
+            artifact_name: mem.exe
 
     steps:
       - name: Checkout code
@@ -49,9 +49,9 @@ jobs:
         shell: bash
         run: |
           if [ "${{ matrix.platform }}" = "windows" ]; then
-            echo "asset_name=vit-${{ matrix.mode }}-${{ matrix.platform }}-${{ matrix.arch }}.exe" >> $GITHUB_OUTPUT
+            echo "asset_name=mem-${{ matrix.mode }}-${{ matrix.platform }}-${{ matrix.arch }}.exe" >> $GITHUB_OUTPUT
           else
-            echo "asset_name=vit-${{ matrix.mode }}-${{ matrix.platform }}-${{ matrix.arch }}" >> $GITHUB_OUTPUT
+            echo "asset_name=mem-${{ matrix.mode }}-${{ matrix.platform }}-${{ matrix.arch }}" >> $GITHUB_OUTPUT
           fi
 
       - name: Set up Python
@@ -83,30 +83,30 @@ jobs:
         run: |
           pyinstaller --onefile \
             --name ${{ matrix.artifact_name }} \
-            --hidden-import=vit.core \
-            --hidden-import=vit.utils \
-            --hidden-import=vit.storage \
+            --hidden-import=memov.core \
+            --hidden-import=memov.utils \
+            --hidden-import=memov.storage \
             --hidden-import=chromadb \
             --hidden-import=litellm \
             --collect-all chromadb \
             --collect-all litellm \
             --noconfirm \
-            vit/main.py
+            memov/main.py
 
       - name: Build binary with PyInstaller (Windows)
         if: matrix.platform == 'windows'
         run: |
           pyinstaller --onefile `
             --name ${{ matrix.artifact_name }} `
-            --hidden-import=vit.core `
-            --hidden-import=vit.utils `
-            --hidden-import=vit.storage `
+            --hidden-import=memov.core `
+            --hidden-import=memov.utils `
+            --hidden-import=memov.storage `
             --hidden-import=chromadb `
             --hidden-import=litellm `
             --collect-all chromadb `
             --collect-all litellm `
             --noconfirm `
-            vit/main.py
+            memov/main.py
 
       - name: Test binary (Linux/macOS)
         if: matrix.platform != 'windows'
@@ -178,10 +178,10 @@ jobs:
 
             ### Build Modes
 
-            **Basic Mode** (`vit-basic-*`): Lightweight build with core version control features only (~10-20MB)
+            **Basic Mode** (`mem-basic-*`): Lightweight build with core version control features only (~10-20MB)
             - Commands: init, track, snap, rename, remove, history, show, jump, status, amend, version, report
 
-            **RAG Mode** (`vit-rag-*`): Full-featured build with semantic search capabilities (~100-150MB)
+            **RAG Mode** (`mem-rag-*`): Full-featured build with semantic search capabilities (~100-150MB)
             - All basic commands + sync, search (requires ChromaDB)
 
             ---
@@ -189,51 +189,51 @@ jobs:
             ### Linux
 
             **Basic:**
-            - [vit-basic-linux-x86_64.tar.gz](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/vit-basic-linux-x86_64.tar.gz)
+            - [mem-basic-linux-x86_64.tar.gz](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/mem-basic-linux-x86_64.tar.gz)
 
             **RAG:**
-            - [vit-rag-linux-x86_64.tar.gz](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/vit-rag-linux-x86_64.tar.gz)
+            - [mem-rag-linux-x86_64.tar.gz](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/mem-rag-linux-x86_64.tar.gz)
 
             ### macOS
 
             **Basic:**
-            - [vit-basic-macos-x86_64.tar.gz](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/vit-basic-macos-x86_64.tar.gz) (Intel)
-            - [vit-basic-macos-arm64.tar.gz](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/vit-basic-macos-arm64.tar.gz) (Apple Silicon)
+            - [mem-basic-macos-x86_64.tar.gz](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/mem-basic-macos-x86_64.tar.gz) (Intel)
+            - [mem-basic-macos-arm64.tar.gz](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/mem-basic-macos-arm64.tar.gz) (Apple Silicon)
 
             **RAG:**
-            - [vit-rag-macos-x86_64.tar.gz](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/vit-rag-macos-x86_64.tar.gz) (Intel)
-            - [vit-rag-macos-arm64.tar.gz](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/vit-rag-macos-arm64.tar.gz) (Apple Silicon)
+            - [mem-rag-macos-x86_64.tar.gz](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/mem-rag-macos-x86_64.tar.gz) (Intel)
+            - [mem-rag-macos-arm64.tar.gz](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/mem-rag-macos-arm64.tar.gz) (Apple Silicon)
 
             ### Windows
 
             **Basic:**
-            - [vit-basic-windows-x86_64.exe.zip](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/vit-basic-windows-x86_64.exe.zip)
+            - [mem-basic-windows-x86_64.exe.zip](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/mem-basic-windows-x86_64.exe.zip)
 
             **RAG:**
-            - [vit-rag-windows-x86_64.exe.zip](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/vit-rag-windows-x86_64.exe.zip)
+            - [mem-rag-windows-x86_64.exe.zip](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/mem-rag-windows-x86_64.exe.zip)
 
             ## Installation
 
             ### Linux / macOS
             ```bash
             # Download and extract (replace <mode> with 'basic' or 'rag')
-            tar -xzf vit-<mode>-<platform>-<arch>.tar.gz
+            tar -xzf mem-<mode>-<platform>-<arch>.tar.gz
 
             # Move to PATH
-            sudo mv vit-<mode>-<platform>-<arch> /usr/local/bin/vit
+            sudo mv mem-<mode>-<platform>-<arch> /usr/local/bin/mem
 
             # Verify installation
-            vit --help
+            mem --help
             ```
 
             ### Windows
             ```powershell
             # Extract the zip file
-            # Move vit-<mode>-windows-x86_64.exe to a directory in your PATH
+            # Move mem-<mode>-windows-x86_64.exe to a directory in your PATH
             # Or add the directory to your PATH environment variable
 
             # Verify installation
-            vit --help
+            mem --help
             ```
 
             See [BUILD_AND_INSTALL.md](https://github.com/${{ github.repository }}/blob/main/docs/BUILD_AND_INSTALL.md) for detailed instructions.

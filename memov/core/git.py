@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 from typing import Optional
 
-from vit.utils.string_utils import clean_windows_git_lstree_output
+from memov.utils.string_utils import clean_windows_git_lstree_output
 
 LOGGER = logging.getLogger(__name__)
 
@@ -233,7 +233,7 @@ class GitManager:
             return ""
 
         # Get the parent commit hash
-        parent_hash = GitManager.get_commit_id_by_ref(bare_repo, "refs/vit/HEAD", verbose=False)
+        parent_hash = GitManager.get_commit_id_by_ref(bare_repo, "refs/memov/HEAD", verbose=False)
 
         # Commit the tree
         commit_hash = GitManager.commit_tree(bare_repo, tree_hash, commit_msg, parent_hash)
@@ -279,7 +279,7 @@ class GitManager:
             return ""
 
         # Get the parent commit hash
-        parent_hash = GitManager.get_commit_id_by_ref(bare_repo, "refs/vit/HEAD", verbose=False)
+        parent_hash = GitManager.get_commit_id_by_ref(bare_repo, "refs/memov/HEAD", verbose=False)
 
         # Commit the tree
         commit_hash = GitManager.commit_tree(bare_repo, tree_hash, commit_msg, parent_hash)
@@ -287,7 +287,7 @@ class GitManager:
 
     @staticmethod
     def git_show(bare_repo: str, commit_id: str, return_output: bool = False) -> Optional[str]:
-        """Show details of a specific snapshot in the vit bare repo, similar to git show.
+        """Show details of a specific snapshot in the memov bare repo, similar to git show.
 
         Args:
             bare_repo: Path to the bare git repository
@@ -411,10 +411,10 @@ class GitManager:
         Args:
             repo_path (str): Path to the Git repository.
             default_name (str | None): Default name to set if user.name is not set.
-            default_email (str | None): Default email to set if user.email is not set. If None, use "vit" and "vit@example.com".
+            default_email (str | None): Default email to set if user.email is not set. If None, use "memov" and "memov@example.com".
         """
-        default_name = default_name or "vit"
-        default_email = default_email or "vit@example.com"
+        default_name = default_name or "memov"
+        default_email = default_email or "memov@example.com"
 
         def set_git_config(key: str, value: str) -> bool:
             """Set a git config key to a specific value, if not already set."""

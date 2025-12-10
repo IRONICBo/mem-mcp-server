@@ -83,7 +83,7 @@ These are available to MCP clients through the server:
 - `snap(user_prompt: str, original_response: str, agent_plan: list[str], files_changed: str)`
   - Record every user interaction with automatic file tracking. Handles untracked vs modified files intelligently.
 
-- `vit_sync()`
+- `mem_sync()`
   - Sync all pending operations to VectorDB for semantic search capabilities.
 
 ### Validation & Debugging
