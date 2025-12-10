@@ -8,8 +8,8 @@ from rich.console import Console
 from rich.table import Table
 from typing_extensions import Annotated
 
-from memov.core.manager import MemovManager, MemStatus
-from memov.utils.logging_utils import setup_logging
+from vit.core.manager import VitManager, VitStatus
+from vit.utils.logging_utils import setup_logging
 
 console = Console()
 
@@ -40,25 +40,25 @@ ByUserOption = Annotated[
 
 # Create Typer app
 app = typer.Typer(
-    name="memov",
-    help="memov - AI-assisted version control on top of Git. Track, snapshot, and manage your project evolution.",
+    name="vit",
+    help="vit - AI-assisted version control on top of Git. Track, snapshot, and manage your project evolution.",
     no_args_is_help=True,
     context_settings={"help_option_names": ["-h", "--help"]},
     add_completion=False,  # Disable shell completion for now
 )
 
 
-def get_manager(loc: str, skip_mem_check: bool = False) -> MemovManager:
-    """Get MemovManager instance, and config the logging."""
+def get_manager(loc: str, skip_vit_check: bool = False) -> VitManager:
+    """Get VitManager instance, and config the logging."""
     # Configure logging
     setup_logging(loc)
 
-    # Validate and return MemovManager instance
+    # Validate and return VitManager instance
     loc = os.path.abspath(loc)
-    manager = MemovManager(project_path=loc)
+    manager = VitManager(project_path=loc)
 
-    status = manager.check(only_basic_check=skip_mem_check)
-    if status is not MemStatus.SUCCESS:
+    status = manager.check(only_basic_check=skip_vit_check)
+    if status is not VitStatus.SUCCESS:
         sys.exit(1)
 
     return manager
@@ -66,8 +66,8 @@ def get_manager(loc: str, skip_mem_check: bool = False) -> MemovManager:
 
 @app.command()
 def init(loc: LocOption = ".") -> None:
-    """Initialize memov repository in the specified location."""
-    manager = get_manager(loc, skip_mem_check=True)
+    """Initialize vit repository in the specified location."""
+    manager = get_manager(loc, skip_vit_check=True)
     manager.init()
 
 
@@ -182,7 +182,7 @@ def amend(
 @app.command()
 def version() -> None:
     """Show version information."""
-    manager = get_manager(loc=".", skip_mem_check=True)
+    manager = get_manager(loc=".", skip_vit_check=True)
     manager.version()
 
 
@@ -205,13 +205,13 @@ def report(
 
     Example:
         # Get JSON report for external MCP
-        mem report
+        vit report
 
         # Save report to file
-        mem report > commit_info.json
+        vit report > commit_info.json
 
         # Use with bash variables
-        REPORT=$(mem report)
+        REPORT=$(vit report)
         COMMIT_HASH=$(echo $REPORT | jq -r '.commit_hash')
     """
     import json
@@ -222,7 +222,7 @@ def report(
     report_data = manager.report(format=format)
 
     if report_data is None:
-        console.print("[yellow]No commits found in memov repository[/yellow]")
+        console.print("[yellow]No commits found in vit repository[/yellow]")
         sys.exit(1)
 
     # Output based on format
@@ -257,9 +257,9 @@ def sync(loc: LocOption = ".") -> None:
     and must be explicitly synced using this command.
 
     Example:
-        mem snap file1.py
-        mem snap file2.py
-        mem sync  # Write all pending operations to VectorDB
+        vit snap file1.py
+        vit snap file2.py
+        vit sync  # Write all pending operations to VectorDB
     """
     manager = get_manager(loc)
 
@@ -269,9 +269,9 @@ def sync(loc: LocOption = ".") -> None:
             "[red]✗ RAG mode is not available[/red]\n\n"
             "[yellow]This command requires ChromaDB dependencies.[/yellow]\n"
             "Install with:\n"
-            "  [cyan]pip install memov[rag][/cyan]\n"
+            "  [cyan]pip install vit[rag][/cyan]\n"
             "or\n"
-            "  [cyan]uv pip install memov[rag][/cyan]\n\n"
+            "  [cyan]uv pip install vit[rag][/cyan]\n\n"
             "[dim]Note: Use the basic mode binary if you don't need semantic search.[/dim]"
         )
         sys.exit(1)
@@ -340,16 +340,16 @@ def search(
 
     Examples:
         # Search by prompt
-        mem search "authentication bug fix"
+        vit search "authentication bug fix"
 
         # Search by file paths
-        mem search "src/auth.py" --by-files
+        vit search "src/auth.py" --by-files
 
         # Filter by operation type
-        mem search "refactor" --type snap
+        vit search "refactor" --type snap
 
         # Limit results and show distances
-        mem search "database" --limit 5 --show-distance
+        vit search "database" --limit 5 --show-distance
     """
     manager = get_manager(loc)
 
@@ -359,9 +359,9 @@ def search(
             "[red]✗ RAG mode is not available[/red]\n\n"
             "[yellow]This command requires ChromaDB dependencies.[/yellow]\n"
             "Install with:\n"
-            "  [cyan]pip install memov[rag][/cyan]\n"
+            "  [cyan]pip install vit[rag][/cyan]\n"
             "or\n"
-            "  [cyan]uv pip install memov[rag][/cyan]\n\n"
+            "  [cyan]uv pip install vit[rag][/cyan]\n\n"
             "[dim]Note: Use the basic mode binary if you don't need semantic search.[/dim]"
         )
         sys.exit(1)
@@ -462,7 +462,7 @@ def search(
 
 
 def main() -> None:
-    """Main entry point for the memov command line interface."""
+    """Main entry point for the vit command line interface."""
     try:
         app()
     except KeyboardInterrupt:

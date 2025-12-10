@@ -12,17 +12,17 @@ from typing import Optional
 
 import pathspec
 
-from memov.core.git import GitManager
-from memov.storage import CHROMADB_AVAILABLE
-from memov.storage.vectordb import VectorDB
-from memov.utils.print_utils import Color
-from memov.utils.string_utils import short_msg
+from vit.core.git import GitManager
+from vit.storage import CHROMADB_AVAILABLE
+from vit.storage.vectordb import VectorDB
+from vit.utils.print_utils import Color
+from vit.utils.string_utils import short_msg
 
 LOGGER = logging.getLogger(__name__)
 
 
-class MemStatus(Enum):
-    """Mem operation status."""
+class VitStatus(Enum):
+    """Vit operation status."""
 
     SUCCESS = "success"
     PROJECT_NOT_FOUND = "project_not_found"
@@ -31,25 +31,25 @@ class MemStatus(Enum):
     UNKNOWN_ERROR = "unknown_error"
 
 
-class MemovManager:
+class VitManager:
     def __init__(
         self,
         project_path: str,
         default_name: Optional[str] = None,
         default_email: Optional[str] = None,
     ) -> None:
-        """Initialize the MemovManager."""
+        """Initialize the VitManager."""
         self.project_path = project_path
         self.default_name = default_name
         self.default_email = default_email
 
-        # Memov config paths
-        self.mem_root_path = os.path.join(self.project_path, ".mem")
-        self.bare_repo_path = os.path.join(self.mem_root_path, "memov.git")
-        self.branches_config_path = os.path.join(self.mem_root_path, "branches.json")
-        self.memignore_path = os.path.join(self.project_path, ".memignore")
-        self.vectordb_path = os.path.join(self.mem_root_path, "vectordb")
-        self.pending_writes_path = os.path.join(self.mem_root_path, "pending_writes.json")
+        # Vit config paths
+        self.vit_root_path = os.path.join(self.project_path, ".vit")
+        self.bare_repo_path = os.path.join(self.vit_root_path, "vit.git")
+        self.branches_config_path = os.path.join(self.vit_root_path, "branches.json")
+        self.vitignore_path = os.path.join(self.project_path, ".vitignore")
+        self.vectordb_path = os.path.join(self.vit_root_path, "vectordb")
+        self.pending_writes_path = os.path.join(self.vit_root_path, "pending_writes.json")
 
         # Initialize VectorDB (lazy initialization - only when needed)
         self._vectordb: Optional[VectorDB] = None
@@ -73,46 +73,46 @@ class MemovManager:
         if not self.is_rag_available():
             raise ImportError(
                 "RAG mode is not available. ChromaDB dependencies are not installed.\n"
-                "Install with: pip install memov[rag] or uv pip install memov[rag]"
+                "Install with: pip install vit[rag] or uv pip install vit[rag]"
             )
 
         if self._vectordb is None:
             # Use lightweight default embedding (no heavy dependencies)
-            # To use other backends, set MEMOV_EMBEDDING_BACKEND environment variable:
+            # To use other backends, set VIT_EMBEDDING_BACKEND environment variable:
             # - "default": ChromaDB built-in (~50MB) - RECOMMENDED
             # - "fastembed": ONNX Runtime (~30MB)
             # - "openai": OpenAI API (<5MB, requires API key)
             # - "sentence-transformers": Original (~1.5GB)
-            embedding_backend = os.getenv("MEMOV_EMBEDDING_BACKEND", "default")
+            embedding_backend = os.getenv("VIT_EMBEDDING_BACKEND", "default")
 
             self._vectordb = VectorDB(
                 persist_directory=Path(self.vectordb_path),
-                collection_name="memov_memories",
+                collection_name="vit_memories",
                 chunk_size=768,
                 embedding_backend=embedding_backend,
             )
         return self._vectordb
 
-    def check(self, only_basic_check: bool = False) -> MemStatus:
-        """Check some basic conditions for the memov repo."""
+    def check(self, only_basic_check: bool = False) -> VitStatus:
+        """Check some basic conditions for the vit repo."""
         # Check project path
         if not os.path.exists(self.project_path):
             LOGGER.error(f"Project path {self.project_path} does not exist.")
-            return MemStatus.PROJECT_NOT_FOUND
+            return VitStatus.PROJECT_NOT_FOUND
 
         # If only basic check is required, return early
         if only_basic_check:
             LOGGER.debug("Only basic check is required, skipping further checks.")
-            return MemStatus.SUCCESS
+            return VitStatus.SUCCESS
 
         # Check the bare repo
         if not os.path.exists(self.bare_repo_path):
             LOGGER.error(
-                f"Memov bare repo {self.bare_repo_path} does not exist.\nPlease run `mem -h` to see the help message."
+                f"Vit bare repo {self.bare_repo_path} does not exist.\nPlease run `vit -h` to see the help message."
             )
-            return MemStatus.BARE_REPO_NOT_FOUND
+            return VitStatus.BARE_REPO_NOT_FOUND
 
-        return MemStatus.SUCCESS
+        return VitStatus.SUCCESS
 
     def version(self) -> str:
         """Show version information."""
@@ -120,38 +120,38 @@ class MemovManager:
         import importlib.metadata
 
         try:
-            version = importlib.metadata.version("memov")
-            LOGGER.info(f"memov version {version}")
+            version = importlib.metadata.version("vit")
+            LOGGER.info(f"vit version {version}")
         except importlib.metadata.PackageNotFoundError:
             version = "unknown"
-            LOGGER.info("memov version unknown (development)")
+            LOGGER.info("vit version unknown (development)")
 
         return version
 
-    def init(self) -> MemStatus:
-        """Initialize a memov repo if it doesn't exist."""
+    def init(self) -> VitStatus:
+        """Initialize a vit repo if it doesn't exist."""
         try:
-            # Initialize .mem directory
-            os.makedirs(self.mem_root_path, exist_ok=True)
+            # Initialize .vit directory
+            os.makedirs(self.vit_root_path, exist_ok=True)
             if not os.path.exists(self.bare_repo_path):
                 GitManager.create_bare_repo(self.bare_repo_path)
 
-            # Ensure .memignore exists and is tracked
-            if not os.path.exists(self.memignore_path):
-                with open(self.memignore_path, "w") as f:
-                    f.write("# Add files/directories to ignore from memov tracking\n")
+            # Ensure .vitignore exists and is tracked
+            if not os.path.exists(self.vitignore_path):
+                with open(self.vitignore_path, "w") as f:
+                    f.write("# Add files/directories to ignore from vit tracking\n")
                     f.write("# Ignore all hidden files (starting with .)\n")
                     f.write(".*\n")
                 self.track(
-                    [self.memignore_path],
-                    prompt="Initialize .memignore",
-                    response="Created default .memignore file",
+                    [self.vitignore_path],
+                    prompt="Initialize .vitignore",
+                    response="Created default .vitignore file",
                 )
 
-            return MemStatus.SUCCESS
+            return VitStatus.SUCCESS
         except Exception as e:
-            LOGGER.error(f"Error initializing memov project: {e}")
-            return MemStatus.UNKNOWN_ERROR
+            LOGGER.error(f"Error initializing vit project: {e}")
+            return VitStatus.UNKNOWN_ERROR
 
     def track(
         self,
@@ -159,17 +159,17 @@ class MemovManager:
         prompt: Optional[str] = None,
         response: Optional[str] = None,
         by_user: bool = False,
-    ) -> MemStatus:
-        """Track files in the memov repo, generating a commit to record the operation."""
+    ) -> VitStatus:
+        """Track files in the vit repo, generating a commit to record the operation."""
         try:
             # Return early if no file paths are provided
             if not file_paths:
                 LOGGER.error("No files to track.")
-                return MemStatus.SUCCESS
+                return VitStatus.SUCCESS
 
-            # Get the head commit of the memov repo
+            # Get the head commit of the vit repo
             head_commit = GitManager.get_commit_id_by_ref(
-                self.bare_repo_path, "refs/memov/HEAD", verbose=False
+                self.bare_repo_path, "refs/vit/HEAD", verbose=False
             )
             if not head_commit:  # If HEAD commit does not exist, try to get the main branch commit
                 head_commit = GitManager.get_commit_id_by_ref(
@@ -178,7 +178,7 @@ class MemovManager:
             if not head_commit:  # If still no commit, set to None
                 head_commit = None
 
-            # Get all currently tracked files in the memov repo
+            # Get all currently tracked files in the vit repo
             tracked_file_rel_paths, tracked_file_abs_paths = [], []
 
             if head_commit:
@@ -193,7 +193,7 @@ class MemovManager:
                 LOGGER.warning(
                     "No new files to track. All provided files are already tracked or ignored."
                 )
-                return MemStatus.SUCCESS
+                return VitStatus.SUCCESS
 
             # Build tree with: new files from workspace, existing files from HEAD (to preserve their state)
             # This ensures we don't accidentally commit manual changes to existing files
@@ -224,7 +224,7 @@ class MemovManager:
                     blob_hash = GitManager.write_blob(self.bare_repo_path, abs_path)
                     if not blob_hash:
                         LOGGER.error(f"Failed to create blob for {rel_path}")
-                        return MemStatus.UNKNOWN_ERROR
+                        return VitStatus.UNKNOWN_ERROR
 
                     parts = rel_path.split("/")
                     current = tree_structure
@@ -247,7 +247,7 @@ class MemovManager:
 
                 if not commit_hash:
                     LOGGER.error("Failed to create track commit")
-                    return MemStatus.FAILED_TO_COMMIT
+                    return VitStatus.FAILED_TO_COMMIT
 
                 # Update branch
                 self._validate_and_fix_branches()
@@ -270,13 +270,13 @@ class MemovManager:
                 commit_hash = self._commit(commit_msg, all_files)
                 if not commit_hash:
                     LOGGER.error("Failed to commit tracked files.")
-                    return MemStatus.FAILED_TO_COMMIT
+                    return VitStatus.FAILED_TO_COMMIT
 
             LOGGER.info(
-                f"Tracked file(s) in memov repo and committed: {[abs_path for _, abs_path in new_files]}"
+                f"Tracked file(s) in vit repo and committed: {[abs_path for _, abs_path in new_files]}"
             )
 
-            # Add to pending writes (will be synced later via mem sync)
+            # Add to pending writes (will be synced later via vit sync)
             self._add_to_pending_writes(
                 operation_type="track",
                 commit_hash=commit_hash,
@@ -287,12 +287,12 @@ class MemovManager:
                 files=[rel_file for rel_file, _ in new_files],
             )
 
-            return MemStatus.SUCCESS
+            return VitStatus.SUCCESS
         except Exception as e:
             tb = traceback.extract_tb(e.__traceback__)
             filename, lineno, func, code = tb[-1]  # last frame
-            LOGGER.error(f"Error tracking files in memov repo: {e}, {filename}:{lineno} - {code}")
-            return MemStatus.UNKNOWN_ERROR
+            LOGGER.error(f"Error tracking files in vit repo: {e}, {filename}:{lineno} - {code}")
+            return VitStatus.UNKNOWN_ERROR
 
     def snapshot(
         self,
@@ -301,8 +301,8 @@ class MemovManager:
         response: Optional[str] = None,
         agent_plan: Optional[str] = None,
         by_user: bool = False,
-    ) -> MemStatus:
-        """Create a snapshot of the current project state in the memov repo, generating a commit to record the operation.
+    ) -> VitStatus:
+        """Create a snapshot of the current project state in the vit repo, generating a commit to record the operation.
 
         Args:
             file_paths: Optional list of specific file paths to snapshot. If None, snapshots all tracked files.
@@ -312,13 +312,13 @@ class MemovManager:
             by_user: Whether the snapshot was initiated by the user (True) or AI (False)
 
         Returns:
-            MemStatus indicating success or failure
+            VitStatus indicating success or failure
         """
         try:
-            # Get all tracked files in the memov repo and their previous blob hashes
+            # Get all tracked files in the vit repo and their previous blob hashes
             tracked_file_rel_paths, tracked_file_abs_paths = [], []
             head_commit = GitManager.get_commit_id_by_ref(
-                self.bare_repo_path, "refs/memov/HEAD", verbose=False
+                self.bare_repo_path, "refs/vit/HEAD", verbose=False
             )
             if head_commit:
                 tracked_file_rel_paths, tracked_file_abs_paths = GitManager.get_files_by_commit(
@@ -328,7 +328,7 @@ class MemovManager:
             # Return early if no tracked files are found
             if len(tracked_file_rel_paths) == 0:
                 LOGGER.warning("No tracked files to snapshot. Please track files first.")
-                return MemStatus.SUCCESS
+                return VitStatus.SUCCESS
 
             # If specific files are provided, only update those files in the snapshot
             if file_paths is not None:
@@ -365,7 +365,7 @@ class MemovManager:
                 tracked_specified = specified_rel_paths & set(tracked_file_rel_paths)
                 if not tracked_specified:
                     LOGGER.warning("None of the specified files are tracked. Nothing to snapshot.")
-                    return MemStatus.SUCCESS
+                    return VitStatus.SUCCESS
 
                 # Get blob hashes for all files in HEAD
                 head_file_blobs = GitManager.get_files_and_blobs_by_commit(
@@ -397,7 +397,7 @@ class MemovManager:
 
                     if not blob_hash:
                         LOGGER.error(f"Failed to get blob for {rel_path}")
-                        return MemStatus.UNKNOWN_ERROR
+                        return VitStatus.UNKNOWN_ERROR
 
                     # Build tree structure
                     parts = rel_path.split("/")
@@ -417,7 +417,7 @@ class MemovManager:
 
                 if not commit_hash:
                     LOGGER.error("Failed to create snapshot commit")
-                    return MemStatus.FAILED_TO_COMMIT
+                    return VitStatus.FAILED_TO_COMMIT
 
                 # Update branch and return
                 self._validate_and_fix_branches()
@@ -425,9 +425,9 @@ class MemovManager:
                     self.bare_repo_path, self.default_name, self.default_email
                 )
                 self._update_branch(commit_hash)
-                LOGGER.info("Snapshot created in memov repo.")
+                LOGGER.info("Snapshot created in vit repo.")
 
-                # Add to pending writes (will be synced later via mem sync)
+                # Add to pending writes (will be synced later via vit sync)
                 self._add_to_pending_writes(
                     operation_type="snap",
                     commit_hash=commit_hash,
@@ -438,7 +438,7 @@ class MemovManager:
                     files=list(tracked_specified),
                 )
 
-                return MemStatus.SUCCESS
+                return VitStatus.SUCCESS
             else:
                 # Original behavior: snapshot all tracked files
                 # Filter out new files that are not tracked or should be ignored
@@ -461,9 +461,9 @@ class MemovManager:
                 )
 
             commit_hash = self._commit(commit_msg, commit_file_paths)
-            LOGGER.info("Snapshot created in memov repo.")
+            LOGGER.info("Snapshot created in vit repo.")
 
-            # Add to pending writes (will be synced later via mem sync)
+            # Add to pending writes (will be synced later via vit sync)
             if commit_hash:
                 self._add_to_pending_writes(
                     operation_type="snap",
@@ -475,10 +475,10 @@ class MemovManager:
                     files=tracked_file_rel_paths,
                 )
 
-            return MemStatus.SUCCESS
+            return VitStatus.SUCCESS
         except Exception as e:
-            LOGGER.error(f"Error creating snapshot in memov repo: {e}")
-            return MemStatus.UNKNOWN_ERROR
+            LOGGER.error(f"Error creating snapshot in vit repo: {e}")
+            return VitStatus.UNKNOWN_ERROR
 
     def rename(
         self,
@@ -488,7 +488,7 @@ class MemovManager:
         response: Optional[str] = None,
         by_user: bool = False,
     ) -> None:
-        """Rename a tracked file in the memov repo, and generate a commit to record the operation. Supports branches."""
+        """Rename a tracked file in the vit repo, and generate a commit to record the operation. Supports branches."""
         try:
             old_abs_path = os.path.abspath(old_file_path)
             new_abs_path = os.path.abspath(new_file_path)
@@ -510,7 +510,7 @@ class MemovManager:
 
             # Return early if the file is tracked on the current branch
             head_commit = GitManager.get_commit_id_by_ref(
-                self.bare_repo_path, "refs/memov/HEAD", verbose=False
+                self.bare_repo_path, "refs/vit/HEAD", verbose=False
             )
             tracked_files = []
             if head_commit:
@@ -533,12 +533,12 @@ class MemovManager:
                 f"Prompt: {prompt}\nResponse: {response}\nSource: {'User' if by_user else 'AI'}"
             )
 
-            # Commit the rename in the memov repo
+            # Commit the rename in the vit repo
             file_list = self._filter_new_files([self.project_path], tracked_file_rel_paths=None)
             file_list = {rel_path: abs_path for rel_path, abs_path in file_list}
             commit_hash = self._commit(commit_msg, file_list)
 
-            # Add to pending writes (will be synced later via mem sync)
+            # Add to pending writes (will be synced later via vit sync)
             if commit_hash:
                 new_rel_path = os.path.relpath(new_abs_path, self.project_path)
                 self._add_to_pending_writes(
@@ -552,10 +552,10 @@ class MemovManager:
                 )
 
             LOGGER.info(
-                f"Renamed file in memov repo from {old_file_path} to {new_file_path} and committed."
+                f"Renamed file in vit repo from {old_file_path} to {new_file_path} and committed."
             )
         except Exception as e:
-            LOGGER.error(f"Error renaming file in memov repo: {e}")
+            LOGGER.error(f"Error renaming file in vit repo: {e}")
 
     def remove(
         self,
@@ -564,14 +564,14 @@ class MemovManager:
         response: Optional[str] = None,
         by_user: bool = False,
     ) -> None:
-        """Remove a tracked file from the memov repo, and generate a commit to record the operation."""
+        """Remove a tracked file from the vit repo, and generate a commit to record the operation."""
         try:
             target_abs_path = os.path.abspath(file_path)
             target_rel_path = os.path.relpath(target_abs_path, self.project_path)
 
             # Check if the file is tracked on the current branch
             head_commit = GitManager.get_commit_id_by_ref(
-                self.bare_repo_path, "refs/memov/HEAD", verbose=False
+                self.bare_repo_path, "refs/vit/HEAD", verbose=False
             )
             tracked_files = []
             if head_commit:
@@ -603,7 +603,7 @@ class MemovManager:
                 f"Prompt: {prompt}\nResponse: {response}\nSource: {'User' if by_user else 'AI'}"
             )
 
-            # Commit the removal in the memov repo
+            # Commit the removal in the vit repo
             # Get current tracked files and exclude the removed file
             tracked_file_rel_paths, tracked_file_abs_paths = [], []
             if head_commit:
@@ -619,7 +619,7 @@ class MemovManager:
 
             commit_hash = self._commit(commit_msg, file_list)
 
-            # Add to pending writes (will be synced later via mem sync)
+            # Add to pending writes (will be synced later via vit sync)
             if commit_hash:
                 self._add_to_pending_writes(
                     operation_type="remove",
@@ -632,25 +632,25 @@ class MemovManager:
                 )
 
             LOGGER.info(
-                f"Removed file from working directory: {target_abs_path} and committed in memov repo."
+                f"Removed file from working directory: {target_abs_path} and committed in vit repo."
             )
         except Exception as e:
-            LOGGER.error(f"Error removing file from memov repo: {e}")
+            LOGGER.error(f"Error removing file from vit repo: {e}")
 
     def history(self) -> None:
-        """Show the history of all branches in the memov bare repo, with table header and wider prompt/resp columns."""
+        """Show the history of all branches in the vit bare repo, with table header and wider prompt/resp columns."""
         try:
-            # Load branches from the memov repo
+            # Load branches from the vit repo
             branches = self._load_branches()
             if branches is None:
                 LOGGER.error(
-                    "No branches found in the memov repo. Please initialize or track files first."
+                    "No branches found in the vit repo. Please initialize or track files first."
                 )
                 return
 
-            # Get the head commit of the memov repo and the branches' commit hashes
+            # Get the head commit of the vit repo and the branches' commit hashes
             head_commit = GitManager.get_commit_id_by_ref(
-                self.bare_repo_path, "refs/memov/HEAD", verbose=False
+                self.bare_repo_path, "refs/vit/HEAD", verbose=False
             )
             commit_to_branch = defaultdict(list)
             for name, commit_hash in branches["branches"].items():
@@ -710,10 +710,10 @@ class MemovManager:
                         f"{operation_type.ljust(10)} {marker} {branch_str.ljust(18)} {hash7.ljust(8)} {prompt_display.ljust(15)} {response_display.ljust(15)}"
                     )
         except Exception as e:
-            LOGGER.error(f"Error showing history in memov repo: {e}")
+            LOGGER.error(f"Error showing history in vit repo: {e}")
 
     def jump(self, commit_hash: str) -> None:
-        """Jump to a specific snapshot in the memov repo (only move HEAD, do not change branches)."""
+        """Jump to a specific snapshot in the vit repo (only move HEAD, do not change branches)."""
         try:
             # Get all files that have ever been tracked
             all_tracked_files = set()
@@ -742,13 +742,13 @@ class MemovManager:
             # Update branch config
             self._update_branch(commit_hash, reset_current_branch=True)
             LOGGER.info(
-                f"Jumped to commit {commit_hash} in memov repo (HEAD updated, branches unchanged)."
+                f"Jumped to commit {commit_hash} in vit repo (HEAD updated, branches unchanged)."
             )
         except Exception as e:
-            LOGGER.error(f"Error jumping to commit in memov repo: {e}")
+            LOGGER.error(f"Error jumping to commit in vit repo: {e}")
 
     def show(self, commit_id: str) -> None:
-        """Show details of a specific snapshot in the memov bare repo, similar to git show."""
+        """Show details of a specific snapshot in the vit bare repo, similar to git show."""
         try:
             GitManager.git_show(self.bare_repo_path, commit_id)
 
@@ -762,12 +762,12 @@ class MemovManager:
         except Exception as e:
             LOGGER.error(f"Error showing snapshot {commit_id} in bare repo: {e}")
 
-    def status(self) -> tuple[MemStatus, dict[str, list[Path]]]:
+    def status(self) -> tuple[VitStatus, dict[str, list[Path]]]:
         """Show status of working directory compared to HEAD snapshot, and display current HEAD commit and branch."""
         try:
             # Get the current HEAD commit and branch
             head_commit = GitManager.get_commit_id_by_ref(
-                self.bare_repo_path, "refs/memov/HEAD", verbose=False
+                self.bare_repo_path, "refs/vit/HEAD", verbose=False
             )
             if head_commit is None:
                 head_commit = GitManager.get_commit_id_by_ref(
@@ -784,9 +784,9 @@ class MemovManager:
             tracked_files_and_blobs = GitManager.get_files_and_blobs_by_commit(
                 self.bare_repo_path, head_commit, self.project_path
             )
-            # Exclude files based on .memignore, but tracked files will still be shown if they exist
+            # Exclude files based on .vitignore, but tracked files will still be shown if they exist
             workspace_files = self._filter_new_files(
-                [self.project_path], tracked_file_rel_paths=None, exclude_memignore=True
+                [self.project_path], tracked_file_rel_paths=None, exclude_vitignore=True
             )
             worktree_files_and_blobs = {}
             for rel_path, abs_path in workspace_files:
@@ -814,7 +814,7 @@ class MemovManager:
                 else:
                     LOGGER.info(f"{Color.GREEN}Clean:     {f}{Color.RESET}")
 
-            return MemStatus.SUCCESS, {
+            return VitStatus.SUCCESS, {
                 "untracked": untracked_files,
                 "deleted": deleted_files,
                 "modified": modified_files,
@@ -824,7 +824,7 @@ class MemovManager:
             tb = traceback.extract_tb(e.__traceback__)
             filename, lineno, func, code = tb[-1]  # last frame
             LOGGER.error(f"Error showing status: {code}, {e}")
-            return MemStatus.UNKNOWN_ERROR, {}
+            return VitStatus.UNKNOWN_ERROR, {}
 
     def amend_commit_message(
         self,
@@ -860,7 +860,7 @@ class MemovManager:
             LOGGER.error(f"Error adding note to commit: {e}")
 
     def _commit(self, commit_msg: str, file_paths: dict[str, str]) -> str:
-        """Commit changes to the memov repo with the given commit message and file paths."""
+        """Commit changes to the vit repo with the given commit message and file paths."""
         try:
             # Validate and fix branches before committing
             self._validate_and_fix_branches()
@@ -877,26 +877,26 @@ class MemovManager:
 
             # Update the branch metadata with the new commit
             self._update_branch(commit_hash)
-            LOGGER.debug(f"Committed changes in memov repo: {commit_msg}")
+            LOGGER.debug(f"Committed changes in vit repo: {commit_msg}")
             return commit_hash
         except Exception as e:
-            LOGGER.error(f"Error committing changes in memov repo: {e}")
+            LOGGER.error(f"Error committing changes in vit repo: {e}")
             return ""
 
     def _filter_new_files(
         self,
         file_paths: list[str],
         tracked_file_rel_paths: Optional[list[str]] = None,
-        exclude_memignore: bool = True,
+        exclude_vitignore: bool = True,
     ) -> list[tuple[str, str]]:
         """Filter out files that are already tracked or should be ignored.
 
         Args:
             file_paths (list[str]): The list of file paths to check.
             tracked_file_rel_paths (list[str] | None): The list of tracked file paths. If None, all files are considered new.
-            exclude_memignore (bool): Whether to exclude files that match .memignore rules.
+            exclude_vitignore (bool): Whether to exclude files that match .vitignore rules.
         """
-        memignore_pspec = self._load_memignore()
+        vitignore_pspec = self._load_vitignore()
 
         def filter(file_rel_path: str) -> bool:
             """Check if the file should be ignored"""
@@ -905,13 +905,13 @@ class MemovManager:
             if tracked_file_rel_paths is not None and file_rel_path in tracked_file_rel_paths:
                 return True
 
-            # Never filter out .memignore itself based on .memignore rules
+            # Never filter out .vitignore itself based on .vitignore rules
             # (but it can still be filtered if already tracked above)
-            if file_rel_path == ".memignore":
+            if file_rel_path == ".vitignore":
                 return False
 
-            # Filter out files that match .memignore rules
-            if exclude_memignore and memignore_pspec.match_file(file_rel_path):
+            # Filter out files that match .vitignore rules
+            if exclude_vitignore and vitignore_pspec.match_file(file_rel_path):
                 return True
 
             return False
@@ -933,13 +933,13 @@ class MemovManager:
                     # Don't filter the current directory itself
                     if (
                         rel_root != "."
-                        and exclude_memignore
-                        and memignore_pspec.match_file(rel_root)
+                        and exclude_vitignore
+                        and vitignore_pspec.match_file(rel_root)
                     ):
                         continue
 
-                    if ".mem" in dirs:
-                        dirs.remove(".mem")
+                    if ".vit" in dirs:
+                        dirs.remove(".vit")
                     if ".git" in dirs:
                         dirs.remove(".git")
 
@@ -985,16 +985,16 @@ class MemovManager:
             i += 1
         return f"develop/{i}"
 
-    def _load_memignore(self) -> pathspec.PathSpec:
-        """Load .memignore rules and return a pathspec.PathSpec object"""
+    def _load_vitignore(self) -> pathspec.PathSpec:
+        """Load .vitignore rules and return a pathspec.PathSpec object"""
         patterns = []
-        if os.path.exists(self.memignore_path):
-            with open(self.memignore_path, "r") as f:
+        if os.path.exists(self.vitignore_path):
+            with open(self.vitignore_path, "r") as f:
                 patterns = [
                     line.strip() for line in f if line.strip() and not line.strip().startswith("#")
                 ]
-        # Exclude .mem and .git directories by default
-        patterns.append(".mem/")
+        # Exclude .vit and .git directories by default
+        patterns.append(".vit/")
         patterns.append(".git/")
         return pathspec.PathSpec.from_lines("gitwildmatch", patterns)
 
@@ -1005,7 +1005,7 @@ class MemovManager:
             return
 
         head_commit = GitManager.get_commit_id_by_ref(
-            self.bare_repo_path, "refs/memov/HEAD", verbose=False
+            self.bare_repo_path, "refs/vit/HEAD", verbose=False
         )
 
         fixed = False
@@ -1029,14 +1029,14 @@ class MemovManager:
             self._save_branches(branches)
 
     def _update_branch(self, new_commit: str, reset_current_branch: bool = False) -> None:
-        """Automatically create or update a branch in the memov repo based on the new commit."""
+        """Automatically create or update a branch in the vit repo based on the new commit."""
         branches = self._load_branches()
 
         # First commit to create the default branch if it doesn't exist
         if branches is None:
             branches = {"current": "main", "branches": {"main": new_commit}}
             self._save_branches(branches)
-            GitManager.update_ref(self.bare_repo_path, "refs/memov/HEAD", new_commit)
+            GitManager.update_ref(self.bare_repo_path, "refs/vit/HEAD", new_commit)
             return
 
         # If reset_current_branch is True, save current branch and reset
@@ -1044,14 +1044,14 @@ class MemovManager:
             current_branch = branches.get("current")
             if current_branch and current_branch in branches["branches"]:
                 head_commit = GitManager.get_commit_id_by_ref(
-                    self.bare_repo_path, "refs/memov/HEAD", verbose=False
+                    self.bare_repo_path, "refs/vit/HEAD", verbose=False
                 )
                 if head_commit:
                     branches["branches"][current_branch] = head_commit
             branches["current"] = None
         else:
             head_commit = GitManager.get_commit_id_by_ref(
-                self.bare_repo_path, "refs/memov/HEAD", verbose=False
+                self.bare_repo_path, "refs/vit/HEAD", verbose=False
             )
 
             # Prioritize using current branch
@@ -1086,7 +1086,7 @@ class MemovManager:
 
         # Update the branches config file and the HEAD reference
         self._save_branches(branches)
-        GitManager.update_ref(self.bare_repo_path, "refs/memov/HEAD", new_commit)
+        GitManager.update_ref(self.bare_repo_path, "refs/vit/HEAD", new_commit)
 
     def _extract_operation_type(self, commit_message: str) -> str:
         """Extract operation type from commit message first line."""
@@ -1123,8 +1123,8 @@ class MemovManager:
     def _save_pending_writes(self) -> None:
         """Save pending writes to disk for persistence across CLI invocations."""
         try:
-            # Create .mem directory if it doesn't exist
-            os.makedirs(self.mem_root_path, exist_ok=True)
+            # Create .vit directory if it doesn't exist
+            os.makedirs(self.vit_root_path, exist_ok=True)
 
             with open(self.pending_writes_path, "w", encoding="utf-8") as f:
                 json.dump(self._pending_writes, f, indent=2, ensure_ascii=False)
@@ -1161,7 +1161,7 @@ class MemovManager:
             # Get parent commit
             parent_hash = None
             head_commit = GitManager.get_commit_id_by_ref(
-                self.bare_repo_path, "refs/memov/HEAD", verbose=False
+                self.bare_repo_path, "refs/vit/HEAD", verbose=False
             )
             if head_commit and head_commit != commit_hash:
                 parent_hash = head_commit
@@ -1367,10 +1367,10 @@ class MemovManager:
         try:
             # Get the latest commit (HEAD)
             head_commit = GitManager.get_commit_id_by_ref(
-                self.bare_repo_path, "refs/memov/HEAD", verbose=False
+                self.bare_repo_path, "refs/vit/HEAD", verbose=False
             )
             if not head_commit:
-                LOGGER.warning("No commits found in memov repository")
+                LOGGER.warning("No commits found in vit repository")
                 return None
 
             # Get branch information

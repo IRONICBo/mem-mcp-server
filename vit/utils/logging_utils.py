@@ -1,4 +1,4 @@
-"""Logging utilities for memov."""
+"""Logging utilities for vit."""
 
 import logging
 import os
@@ -7,9 +7,9 @@ import sys
 
 def setup_logging(loc: str, level: str = "INFO") -> None:
     """Configure logging for the application with improved setup."""
-    # Ensure .mem directory exists
-    mem_dir = os.path.join(loc, ".mem")
-    os.makedirs(mem_dir, exist_ok=True)
+    # Ensure .vit directory exists
+    vit_dir = os.path.join(loc, ".vit")
+    os.makedirs(vit_dir, exist_ok=True)
 
     root_logger = logging.getLogger()
     root_logger.setLevel(getattr(logging, level.upper(), logging.INFO))
@@ -18,7 +18,7 @@ def setup_logging(loc: str, level: str = "INFO") -> None:
     root_logger.handlers.clear()
 
     # File handler for debug messages
-    log_path = os.path.join(mem_dir, "mem.log")
+    log_path = os.path.join(vit_dir, "vit.log")
     file_handler = logging.FileHandler(log_path, mode="a", encoding="utf-8")
     file_formatter = logging.Formatter(
         "%(asctime)s - %(levelname)s - %(name)s:%(lineno)s - %(message)s"

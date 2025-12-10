@@ -1,5 +1,5 @@
 #!/bin/bash
-# Build script for memov CLI - supports basic and rag modes
+# Build script for vit CLI - supports basic and rag modes
 
 set -e
 
@@ -82,9 +82,9 @@ else
     PLATFORM_NAME="$PLATFORM"
 fi
 
-BINARY_NAME="mem-${MODE}-${PLATFORM_NAME}-${ARCH}"
+BINARY_NAME="vit-${MODE}-${PLATFORM_NAME}-${ARCH}"
 
-print_info "Building memov CLI in ${MODE} mode..."
+print_info "Building vit CLI in ${MODE} mode..."
 print_info "Platform: ${PLATFORM_NAME}, Architecture: ${ARCH}"
 print_info "Output: ${OUTPUT_DIR}/${BINARY_NAME}"
 
@@ -111,19 +111,19 @@ print_success "Dependencies installed"
 # Build with PyInstaller
 print_info "Building binary with PyInstaller..."
 pyinstaller --onefile \
-    --name mem \
-    --hidden-import=memov.core \
-    --hidden-import=memov.utils \
-    --hidden-import=memov.storage \
+    --name vit \
+    --hidden-import=vit.core \
+    --hidden-import=vit.utils \
+    --hidden-import=vit.storage \
     $([ "$MODE" = "rag" ] && echo "--hidden-import=chromadb --hidden-import=litellm --collect-all chromadb --collect-all litellm") \
     --noconfirm \
-    memov/main.py
+    vit/main.py
 
 print_success "Binary built successfully"
 
 # Rename binary
 print_info "Renaming binary..."
-mv dist/mem "${OUTPUT_DIR}/${BINARY_NAME}"
+mv dist/vit "${OUTPUT_DIR}/${BINARY_NAME}"
 
 print_success "Binary renamed to ${BINARY_NAME}"
 
@@ -149,7 +149,7 @@ echo "Binary:         ${OUTPUT_DIR}/${BINARY_NAME}"
 echo "Size:           $(du -h "${OUTPUT_DIR}/${BINARY_NAME}" | cut -f1)"
 echo ""
 echo "To install:"
-echo "  sudo mv ${OUTPUT_DIR}/${BINARY_NAME} /usr/local/bin/mem"
+echo "  sudo mv ${OUTPUT_DIR}/${BINARY_NAME} /usr/local/bin/vit"
 echo ""
 echo "To test:"
 echo "  ${OUTPUT_DIR}/${BINARY_NAME} --help"
