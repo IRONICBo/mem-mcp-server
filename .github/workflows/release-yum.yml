@@ -1,0 +1,198 @@
+name: Release to YUM/DNF Repository
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 0.0.1-test)'
+        required: true
+
+env:
+  YUM_REPO_BRANCH: yum-repo
+
+jobs:
+  build-rpm:
+    name: Build RPM packages
+    runs-on: ubuntu-latest
+    container:
+      image: fedora:latest
+    strategy:
+      matrix:
+        mode: [basic, rag]
+        arch: [x86_64]
+    steps:
+      - name: Install dependencies
+        run: |
+          dnf install -y rpm-build rpmdevtools curl git
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Get version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${{ github.event.release.tag_name }}"
+            VERSION="${VERSION#v}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
+
+      - name: Download release binary
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          MODE="${{ matrix.mode }}"
+          REPO="${{ github.repository }}"
+
+          curl -sL "https://github.com/${REPO}/releases/download/v${VERSION}/mem-${MODE}-linux-x86_64.tar.gz" -o mem.tar.gz
+          tar -xzf mem.tar.gz
+          chmod +x mem-${MODE}-linux-x86_64
+
+      - name: Setup RPM build environment
+        run: rpmdev-setuptree
+
+      - name: Create RPM spec file and build
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          MODE="${{ matrix.mode }}"
+
+          if [ "$MODE" = "basic" ]; then
+            PKG_NAME="mem"
+            SUMMARY="AI-powered version control tool - memory layer for AI coding agents"
+          else
+            PKG_NAME="mem-rag"
+            SUMMARY="AI-powered version control tool with RAG support"
+          fi
+
+          cat > ~/rpmbuild/SPECS/${PKG_NAME}.spec << EOF
+          Name:           ${PKG_NAME}
+          Version:        ${VERSION}
+          Release:        1%{?dist}
+          Summary:        ${SUMMARY}
+          License:        MIT
+          URL:            https://github.com/${{ github.repository }}
+          Source0:        mem-${MODE}-linux-x86_64
+          BuildArch:      x86_64
+
+          %description
+          mem is an AI-powered version control tool that provides a memory layer
+          for AI coding agents.
+
+          %install
+          mkdir -p %{buildroot}%{_bindir}
+          install -m 755 %{SOURCE0} %{buildroot}%{_bindir}/mem
+
+          %files
+          %{_bindir}/mem
+          EOF
+
+          cp mem-${MODE}-linux-x86_64 ~/rpmbuild/SOURCES/
+          rpmbuild -bb ~/rpmbuild/SPECS/${PKG_NAME}.spec
+
+      - name: Copy RPM to workspace
+        run: |
+          mkdir -p rpms
+          cp ~/rpmbuild/RPMS/x86_64/*.rpm rpms/
+
+      - name: Upload RPM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rpm-${{ matrix.mode }}-${{ matrix.arch }}
+          path: rpms/*.rpm
+          retention-days: 7
+
+  publish-yum-repo:
+    name: Publish YUM Repository
+    needs: build-rpm
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install createrepo
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y createrepo-c
+
+      - name: Download all RPM artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: rpm-*
+          path: rpms/
+          merge-multiple: true
+
+      - name: Checkout YUM repo branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.YUM_REPO_BRANCH }}
+          path: yum-repo
+        continue-on-error: true
+
+      - name: Initialize YUM repo if not exists
+        run: |
+          if [ ! -d "yum-repo/.git" ]; then
+            mkdir -p yum-repo
+            cd yum-repo
+            git init
+            git checkout -b ${{ env.YUM_REPO_BRANCH }}
+          fi
+          mkdir -p yum-repo/packages
+
+      - name: Copy packages to repository
+        run: cp rpms/*.rpm yum-repo/packages/
+
+      - name: Generate YUM repository metadata
+        run: |
+          cd yum-repo
+          createrepo_c packages/
+
+      - name: Create repository configuration file
+        run: |
+          PAGES_URL="${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
+          cat > yum-repo/mem.repo << EOF
+          [mem]
+          name=MEM Repository
+          baseurl=https://${PAGES_URL}/packages
+          enabled=1
+          gpgcheck=0
+          EOF
+
+      - name: Create repository index
+        run: |
+          PAGES_URL="${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
+          cat > yum-repo/index.html << EOF
+          <!DOCTYPE html>
+          <html>
+          <head><title>MEM YUM/DNF Repository</title></head>
+          <body>
+            <h1>MEM YUM/DNF Repository</h1>
+            <h2>Installation (Fedora/RHEL/CentOS)</h2>
+            <pre>
+          # Download and add repository configuration
+          sudo curl -o /etc/yum.repos.d/mem.repo https://${PAGES_URL}/mem.repo
+
+          # Install mem
+          sudo dnf install mem        # Basic version
+          # OR
+          sudo dnf install mem-rag    # RAG version
+            </pre>
+          </body>
+          </html>
+          EOF
+
+      - name: Commit and push YUM repo
+        run: |
+          cd yum-repo
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Update YUM repository"
+            git push origin ${{ env.YUM_REPO_BRANCH }} --force
+          fi

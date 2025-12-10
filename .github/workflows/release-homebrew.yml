@@ -1,0 +1,208 @@
+name: Release to Homebrew
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 0.0.1)'
+        required: true
+
+env:
+  HOMEBREW_TAP_REPO: ${{ github.repository_owner }}/homebrew-mem
+
+jobs:
+  update-homebrew-formula:
+    name: Update Homebrew Formula
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source repo
+        uses: actions/checkout@v4
+
+      - name: Get version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${{ github.event.release.tag_name }}"
+            VERSION="${VERSION#v}"  # Remove 'v' prefix if present
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
+
+      - name: Download release assets and calculate SHA256
+        id: checksums
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          REPO="${{ github.repository }}"
+
+          # Download macOS Intel basic
+          curl -sL "https://github.com/${REPO}/releases/download/v${VERSION}/mem-basic-macos-x86_64.tar.gz" -o macos-intel.tar.gz
+          MACOS_INTEL_SHA=$(sha256sum macos-intel.tar.gz | cut -d' ' -f1)
+          echo "macos_intel_sha=$MACOS_INTEL_SHA" >> $GITHUB_OUTPUT
+
+          # Download macOS ARM basic
+          curl -sL "https://github.com/${REPO}/releases/download/v${VERSION}/mem-basic-macos-arm64.tar.gz" -o macos-arm.tar.gz
+          MACOS_ARM_SHA=$(sha256sum macos-arm.tar.gz | cut -d' ' -f1)
+          echo "macos_arm_sha=$MACOS_ARM_SHA" >> $GITHUB_OUTPUT
+
+          # Download Linux x86_64 basic
+          curl -sL "https://github.com/${REPO}/releases/download/v${VERSION}/mem-basic-linux-x86_64.tar.gz" -o linux-x64.tar.gz
+          LINUX_X64_SHA=$(sha256sum linux-x64.tar.gz | cut -d' ' -f1)
+          echo "linux_x64_sha=$LINUX_X64_SHA" >> $GITHUB_OUTPUT
+
+          echo "SHA256 checksums calculated:"
+          echo "  macOS Intel: $MACOS_INTEL_SHA"
+          echo "  macOS ARM:   $MACOS_ARM_SHA"
+          echo "  Linux x64:   $LINUX_X64_SHA"
+
+      - name: Generate Homebrew Formula
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          REPO="${{ github.repository }}"
+
+          cat > Formula/mem.rb << 'FORMULA_EOF'
+          # typed: false
+          # frozen_string_literal: true
+
+          class Mem < Formula
+            desc "AI-powered version control tool - memory layer for AI coding agents"
+            homepage "https://github.com/${{ github.repository }}"
+            version "${{ steps.version.outputs.version }}"
+            license "MIT"
+
+            on_macos do
+              if Hardware::CPU.intel?
+                url "https://github.com/${REPO}/releases/download/v${VERSION}/mem-basic-macos-x86_64.tar.gz"
+                sha256 "${{ steps.checksums.outputs.macos_intel_sha }}"
+              end
+              if Hardware::CPU.arm?
+                url "https://github.com/${REPO}/releases/download/v${VERSION}/mem-basic-macos-arm64.tar.gz"
+                sha256 "${{ steps.checksums.outputs.macos_arm_sha }}"
+              end
+            end
+
+            on_linux do
+              if Hardware::CPU.intel? && Hardware::CPU.is_64_bit?
+                url "https://github.com/${REPO}/releases/download/v${VERSION}/mem-basic-linux-x86_64.tar.gz"
+                sha256 "${{ steps.checksums.outputs.linux_x64_sha }}"
+              end
+            end
+
+            def install
+              if OS.mac?
+                if Hardware::CPU.intel?
+                  bin.install "mem-basic-macos-x86_64" => "mem"
+                else
+                  bin.install "mem-basic-macos-arm64" => "mem"
+                end
+              else
+                bin.install "mem-basic-linux-x86_64" => "mem"
+              end
+            end
+
+            test do
+              system "#{bin}/mem", "--help"
+            end
+          end
+          FORMULA_EOF
+
+          # Replace placeholders
+          sed -i "s|\${REPO}|${REPO}|g" Formula/mem.rb
+          sed -i "s|\${VERSION}|${VERSION}|g" Formula/mem.rb
+
+      - name: Generate Homebrew Formula (RAG)
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          REPO="${{ github.repository }}"
+
+          # Download RAG versions for checksums
+          curl -sL "https://github.com/${REPO}/releases/download/v${VERSION}/mem-rag-macos-x86_64.tar.gz" -o macos-intel-rag.tar.gz
+          MACOS_INTEL_RAG_SHA=$(sha256sum macos-intel-rag.tar.gz | cut -d' ' -f1)
+
+          curl -sL "https://github.com/${REPO}/releases/download/v${VERSION}/mem-rag-macos-arm64.tar.gz" -o macos-arm-rag.tar.gz
+          MACOS_ARM_RAG_SHA=$(sha256sum macos-arm-rag.tar.gz | cut -d' ' -f1)
+
+          curl -sL "https://github.com/${REPO}/releases/download/v${VERSION}/mem-rag-linux-x86_64.tar.gz" -o linux-x64-rag.tar.gz
+          LINUX_X64_RAG_SHA=$(sha256sum linux-x64-rag.tar.gz | cut -d' ' -f1)
+
+          cat > Formula/mem-rag.rb << FORMULA_EOF
+          # typed: false
+          # frozen_string_literal: true
+
+          class MemRag < Formula
+            desc "AI-powered version control tool with RAG support - full-featured build"
+            homepage "https://github.com/${REPO}"
+            version "${VERSION}"
+            license "MIT"
+
+            on_macos do
+              if Hardware::CPU.intel?
+                url "https://github.com/${REPO}/releases/download/v${VERSION}/mem-rag-macos-x86_64.tar.gz"
+                sha256 "${MACOS_INTEL_RAG_SHA}"
+              end
+              if Hardware::CPU.arm?
+                url "https://github.com/${REPO}/releases/download/v${VERSION}/mem-rag-macos-arm64.tar.gz"
+                sha256 "${MACOS_ARM_RAG_SHA}"
+              end
+            end
+
+            on_linux do
+              if Hardware::CPU.intel? && Hardware::CPU.is_64_bit?
+                url "https://github.com/${REPO}/releases/download/v${VERSION}/mem-rag-linux-x86_64.tar.gz"
+                sha256 "${LINUX_X64_RAG_SHA}"
+              end
+            end
+
+            def install
+              if OS.mac?
+                if Hardware::CPU.intel?
+                  bin.install "mem-rag-macos-x86_64" => "mem"
+                else
+                  bin.install "mem-rag-macos-arm64" => "mem"
+                end
+              else
+                bin.install "mem-rag-linux-x86_64" => "mem"
+              end
+            end
+
+            test do
+              system "#{bin}/mem", "--help"
+            end
+          end
+          FORMULA_EOF
+
+      - name: Upload Formula artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: homebrew-formulas
+          path: Formula/
+          retention-days: 7
+
+      - name: Checkout Homebrew tap repo
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.HOMEBREW_TAP_REPO }}
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: homebrew-tap
+
+      - name: Update tap repository
+        run: |
+          mkdir -p homebrew-tap/Formula
+          cp Formula/*.rb homebrew-tap/Formula/
+
+          cd homebrew-tap
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add Formula/
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Update mem formula to ${{ steps.version.outputs.version }}"
+            git push
+          fi

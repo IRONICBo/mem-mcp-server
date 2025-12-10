@@ -1,0 +1,182 @@
+name: Release to APT Repository
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 0.0.1-test)'
+        required: true
+
+env:
+  APT_REPO_BRANCH: apt-repo
+
+jobs:
+  build-deb:
+    name: Build DEB packages
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        mode: [basic, rag]
+        arch: [amd64]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Get version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${{ github.event.release.tag_name }}"
+            VERSION="${VERSION#v}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
+
+      - name: Download release binary
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          MODE="${{ matrix.mode }}"
+          REPO="${{ github.repository }}"
+
+          curl -sL "https://github.com/${REPO}/releases/download/v${VERSION}/mem-${MODE}-linux-x86_64.tar.gz" -o mem.tar.gz
+          tar -xzf mem.tar.gz
+          chmod +x mem-${MODE}-linux-x86_64
+
+      - name: Build DEB package
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          MODE="${{ matrix.mode }}"
+          ARCH="${{ matrix.arch }}"
+          PKG_NAME="mem"
+          if [ "$MODE" = "rag" ]; then
+            PKG_NAME="mem-rag"
+          fi
+
+          PKG_DIR="${PKG_NAME}_${VERSION}_${ARCH}"
+          mkdir -p "${PKG_DIR}/DEBIAN"
+          mkdir -p "${PKG_DIR}/usr/bin"
+          mkdir -p "${PKG_DIR}/usr/share/doc/${PKG_NAME}"
+
+          cp "mem-${MODE}-linux-x86_64" "${PKG_DIR}/usr/bin/mem"
+          chmod 755 "${PKG_DIR}/usr/bin/mem"
+
+          if [ "$MODE" = "basic" ]; then
+            DESCRIPTION="AI-powered version control tool - memory layer for AI coding agents"
+          else
+            DESCRIPTION="AI-powered version control tool with RAG support"
+          fi
+
+          cat > "${PKG_DIR}/DEBIAN/control" << EOF
+          Package: ${PKG_NAME}
+          Version: ${VERSION}
+          Section: devel
+          Priority: optional
+          Architecture: ${ARCH}
+          Maintainer: Memov Team <contact@memov.dev>
+          Homepage: https://github.com/${{ github.repository }}
+          Description: ${DESCRIPTION}
+          EOF
+
+          dpkg-deb --build "${PKG_DIR}"
+
+      - name: Upload DEB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: deb-${{ matrix.mode }}-${{ matrix.arch }}
+          path: "*.deb"
+          retention-days: 7
+
+  publish-apt-repo:
+    name: Publish APT Repository
+    needs: build-deb
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download all DEB artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: deb-*
+          path: debs/
+          merge-multiple: true
+
+      - name: Checkout APT repo branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.APT_REPO_BRANCH }}
+          path: apt-repo
+        continue-on-error: true
+
+      - name: Initialize APT repo if not exists
+        run: |
+          if [ ! -d "apt-repo/.git" ]; then
+            mkdir -p apt-repo
+            cd apt-repo
+            git init
+            git checkout -b ${{ env.APT_REPO_BRANCH }}
+          fi
+          mkdir -p apt-repo/pool/main/m/mem
+          mkdir -p apt-repo/dists/stable/main/binary-amd64
+
+      - name: Copy packages to pool
+        run: |
+          cp debs/*.deb apt-repo/pool/main/m/mem/
+
+      - name: Generate APT repository metadata
+        run: |
+          cd apt-repo
+          apt-ftparchive packages pool/main > dists/stable/main/binary-amd64/Packages
+          gzip -k -f dists/stable/main/binary-amd64/Packages
+
+          cat > dists/stable/Release << EOF
+          Origin: MEM
+          Label: MEM
+          Suite: stable
+          Codename: stable
+          Architectures: amd64
+          Components: main
+          Description: MEM APT Repository
+          EOF
+          apt-ftparchive release dists/stable >> dists/stable/Release
+
+      - name: Create repository index
+        run: |
+          PAGES_URL="${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
+          cat > apt-repo/index.html << EOF
+          <!DOCTYPE html>
+          <html>
+          <head><title>MEM APT Repository</title></head>
+          <body>
+            <h1>MEM APT Repository</h1>
+            <h2>Installation</h2>
+            <pre>
+          # Add repository (no GPG for simplicity)
+          echo "deb [trusted=yes] https://${PAGES_URL} stable main" | sudo tee /etc/apt/sources.list.d/mem.list
+
+          # Update and install
+          sudo apt update
+          sudo apt install mem        # Basic version
+          # OR
+          sudo apt install mem-rag    # RAG version
+            </pre>
+          </body>
+          </html>
+          EOF
+
+      - name: Commit and push APT repo
+        run: |
+          cd apt-repo
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Update APT repository"
+            git push origin ${{ env.APT_REPO_BRANCH }} --force
+          fi
