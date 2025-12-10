@@ -1,0 +1,15 @@
+Package: mem
+Architecture: amd64
+Version: 0.0.4
+Priority: optional
+Section: devel
+Maintainer: Memov Team <contact@memov.dev>
+Filename: pool/main/m/mem/mem_0.0.4_amd64.deb
+Size: 25128024
+MD5sum: cf1a93f38d83fdea9c0b400611e43ffc
+SHA1: 1fcce9b67662a080ac2806e9af91a3614dfbc967
+SHA256: a86c681ee5c364bd92b71582d1645ecc58c8c1d019be8a39c6ffa72e664b6ed5
+SHA512: cf59fc58071347d8c51f1224fd2905fbdbd4ddff032c8cf495ff95e3003806f76f705e25908f4108da66f1d60954f95767aecf092b68881063e2c21bd5824d9e
+Homepage: https://github.com/IRONICBo/mem-mcp-server
+Description: AI-powered version control tool - memory layer for AI coding agents
+
