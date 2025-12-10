@@ -59,7 +59,7 @@ powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | ie
 Run in your project root directory:
 
 ```bash
-claude mcp add mem-mcp --scope project -- uvx --from git+https://github.com/memovai/memov.git mem stdio $(pwd)
+claude mcp add mem-mcp --scope project -- uvx --from git+https://github.com/memovai/memov.git mem-mcp-launcher stdio $(pwd)
 ```
 
 ### VS Code
@@ -75,7 +75,7 @@ Create `.vscode/mcp.json` in your project root:
       "args": [
         "--from",
         "git+https://github.com/memovai/memov.git",
-        "mem",
+        "mem-mcp-launcher",
         "stdio",
         "${workspaceFolder}"
       ]
@@ -96,13 +96,27 @@ Go to **Files > Preferences > Cursor Settings > MCP**, then add:
       "args": [
         "--from",
         "git+https://github.com/memovai/memov.git",
-        "mem",
+        "mem-mcp-launcher",
         "stdio",
         "${workspaceFolder}"
       ]
     }
   }
 }
+```
+
+### With VectorDB (RAG mode)
+
+To enable semantic search, validation, and debugging tools, install with `[rag]` extras:
+
+**Claude Code:**
+```bash
+claude mcp add mem-mcp --scope project -- uvx --from "git+https://github.com/memovai/memov.git[rag]" mem-mcp-launcher stdio $(pwd)
+```
+
+**VS Code / Cursor:** Change the `--from` argument to:
+```
+"git+https://github.com/memovai/memov.git[rag]"
 ```
 
 ## Installation for Contributors
@@ -118,10 +132,12 @@ These are available to MCP clients through the server:
 - `snap(user_prompt: str, original_response: str, agent_plan: list[str], files_changed: str)`
   - Record every user interaction with automatic file tracking. Handles untracked vs modified files intelligently.
 
+### RAG Tools (requires `[rag]` extras)
+
+These tools are only available when installed with `[rag]` extras.
+
 - `mem_sync()`
   - Sync all pending operations to VectorDB for semantic search capabilities.
-
-### Validation & Debugging
 
 - `validate_commit(commit_hash: str, detailed: bool = True)`
   - Validate a specific commit by comparing prompt/response with actual code changes. Detects context drift and alignment issues.

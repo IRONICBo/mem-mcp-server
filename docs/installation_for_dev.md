@@ -12,7 +12,12 @@
    ```bash
    git clone git@github.com:memovai/memov.git
    cd memov
+
+   # Basic version (core features only)
    uv sync
+
+   # With VectorDB/RAG support (semantic search, validation, debugging)
+   uv sync --extra rag
    ```
 
 2. **Set up development tools:**
@@ -31,6 +36,60 @@
    cd memov
    uv pip install -e ../mem
    ```
+
+## Testing Local Development Version
+
+After `uv sync`, you can test your local MCP server with different clients:
+
+### Claude Code
+
+```bash
+# Navigate to your test project directory
+cd /path/to/your/test/project
+
+# Add local dev MCP server
+claude mcp add mem-mcp --scope project -- /path/to/memov/.venv/bin/mem-mcp-launcher stdio $(pwd)
+```
+
+### VS Code
+
+Create `.vscode/mcp.json` in your test project:
+
+```json
+{
+  "servers": {
+    "mem-mcp": {
+      "type": "stdio",
+      "command": "/path/to/memov/.venv/bin/mem-mcp-launcher",
+      "args": ["stdio", "${workspaceFolder}"]
+    }
+  }
+}
+```
+
+### Cursor
+
+Go to **Files > Preferences > Cursor Settings > MCP**, then add:
+
+```json
+{
+  "mcpServers": {
+    "mem-mcp": {
+      "command": "/path/to/memov/.venv/bin/mem-mcp-launcher",
+      "args": ["stdio", "${workspaceFolder}"]
+    }
+  }
+}
+```
+
+### Using `uv run` (Alternative)
+
+You can also use `uv run` from the memov directory:
+
+```bash
+# From the memov project directory
+uv run mem-mcp-launcher stdio /path/to/your/test/project
+```
 
 ## Available Commands
 
