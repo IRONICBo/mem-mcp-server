@@ -13,29 +13,58 @@ on:
 
 jobs:
   build:
-    name: Build ${{ matrix.mode }} on ${{ matrix.os }}
+    name: Build ${{ matrix.mode }} on ${{ matrix.platform }}-${{ matrix.arch }}
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         mode: [basic, rag]
         include:
-          # Linux builds
-          - os: ubuntu-latest
+          # Linux x86_64 - basic
+          - mode: basic
+            os: ubuntu-latest
             platform: linux
             arch: x86_64
             artifact_name: mem
-          # macOS Intel builds
-          - os: macos-latest
+          # Linux x86_64 - rag
+          - mode: rag
+            os: ubuntu-latest
+            platform: linux
+            arch: x86_64
+            artifact_name: mem
+          # macOS Intel - basic
+          - mode: basic
+            os: macos-13
             platform: macos
             arch: x86_64
             artifact_name: mem
-          # macOS ARM builds
-          - os: macos-latest
+          # macOS Intel - rag
+          - mode: rag
+            os: macos-13
+            platform: macos
+            arch: x86_64
+            artifact_name: mem
+          # macOS ARM - basic
+          - mode: basic
+            os: macos-latest
             platform: macos
             arch: arm64
             artifact_name: mem
-          # Windows builds
-          - os: windows-latest
+          # macOS ARM - rag
+          - mode: rag
+            os: macos-latest
+            platform: macos
+            arch: arm64
+            artifact_name: mem
+          # Windows - basic
+          - mode: basic
+            os: windows-latest
+            platform: windows
+            arch: x86_64
+            artifact_name: mem.exe
+          # Windows - rag
+          - mode: rag
+            os: windows-latest
             platform: windows
             arch: x86_64
             artifact_name: mem.exe
