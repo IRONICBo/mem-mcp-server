@@ -17,7 +17,7 @@ powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | ie
 Run in your project root directory:
 
 ```bash
-claude mcp add mem-mcp --scope project -- uvx --from git+https://github.com/memovai/memov.git mem stdio $(pwd)
+claude mcp add mem-mcp --scope project -- uvx --from git+https://github.com/memovai/memov.git mem-mcp-launcher stdio $(pwd)
 ```
 
 ### VS Code
@@ -33,7 +33,7 @@ Create `.vscode/mcp.json` in your project root:
       "args": [
         "--from",
         "git+https://github.com/memovai/memov.git",
-        "mem",
+        "mem-mcp-launcher",
         "stdio",
         "${workspaceFolder}"
       ]
@@ -54,7 +54,7 @@ Go to **Files > Preferences > Cursor Settings > MCP**, then add:
       "args": [
         "--from",
         "git+https://github.com/memovai/memov.git",
-        "mem",
+        "mem-mcp-launcher",
         "stdio",
         "${workspaceFolder}"
       ]
@@ -69,7 +69,7 @@ To enable semantic search, validation, and debugging tools (`mem_sync`, `validat
 
 **Claude Code:**
 ```bash
-claude mcp add mem-mcp --scope project -- uvx --from "git+https://github.com/memovai/memov.git[rag]" mem stdio $(pwd)
+claude mcp add mem-mcp --scope project -- uvx --from "git+https://github.com/memovai/memov.git[rag]" mem-mcp-launcher stdio $(pwd)
 ```
 
 **VS Code / Cursor:** Change the `--from` argument to:
