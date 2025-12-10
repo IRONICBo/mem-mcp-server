@@ -1,0 +1,114 @@
+name: Release All Packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 0.0.1)'
+        required: true
+      skip_homebrew:
+        description: 'Skip Homebrew release'
+        type: boolean
+        default: false
+      skip_apt:
+        description: 'Skip APT release'
+        type: boolean
+        default: false
+      skip_yum:
+        description: 'Skip YUM release'
+        type: boolean
+        default: false
+
+jobs:
+  trigger-homebrew:
+    if: ${{ !inputs.skip_homebrew }}
+    name: Trigger Homebrew Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Homebrew workflow
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'release-homebrew.yml',
+              ref: 'main',
+              inputs: {
+                version: '${{ inputs.version }}'
+              }
+            })
+
+  trigger-apt:
+    if: ${{ !inputs.skip_apt }}
+    name: Trigger APT Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger APT workflow
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'release-apt.yml',
+              ref: 'main',
+              inputs: {
+                version: '${{ inputs.version }}'
+              }
+            })
+
+  trigger-yum:
+    if: ${{ !inputs.skip_yum }}
+    name: Trigger YUM Release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger YUM workflow
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'release-yum.yml',
+              ref: 'main',
+              inputs: {
+                version: '${{ inputs.version }}'
+              }
+            })
+
+  summary:
+    name: Release Summary
+    needs: [trigger-homebrew, trigger-apt, trigger-yum]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Generate summary
+        run: |
+          echo "## Package Release Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Version**: ${{ inputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Package Manager | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----------------|--------|" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ inputs.skip_homebrew }}" = "true" ]; then
+            echo "| Homebrew | Skipped |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| Homebrew | Triggered |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "${{ inputs.skip_apt }}" = "true" ]; then
+            echo "| APT | Skipped |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| APT | Triggered |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          if [ "${{ inputs.skip_yum }}" = "true" ]; then
+            echo "| YUM/DNF | Skipped |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "| YUM/DNF | Triggered |" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Check the individual workflow runs for detailed status." >> $GITHUB_STEP_SUMMARY
