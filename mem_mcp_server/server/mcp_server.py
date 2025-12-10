@@ -19,9 +19,13 @@ from starlette.requests import Request
 from starlette.responses import PlainTextResponse
 
 from memov.core.manager import MemovManager, MemStatus
-from memov.debugging import DebugValidator
-from memov.debugging.rag_debugger import RAGDebugger, DebugContext
-from memov.debugging.llm_client import LLMClient
+from memov.storage import CHROMADB_AVAILABLE
+
+# RAG-dependent imports (only available when [rag] extras are installed)
+if CHROMADB_AVAILABLE:
+    from memov.debugging import DebugValidator
+    from memov.debugging.llm_client import LLMClient
+    from memov.debugging.rag_debugger import DebugContext, RAGDebugger
 
 LOGGER = logging.getLogger(__name__)
 
@@ -347,15 +351,16 @@ class MemMCPTools:
                 result_parts.append(f"AI changes: {', '.join(files_processed)}")
                 result = "\n".join(result_parts)
 
-                # Auto-sync to VectorDB after recording changes
-                LOGGER.info("Auto-syncing to VectorDB after snap...")
-                pending_count = memov_manager.get_pending_writes_count()
-                if pending_count > 0:
-                    successful, failed = memov_manager.sync_to_vectordb()
-                    if failed == 0:
-                        result += f"\n[AUTO-SYNC] Successfully synced {successful} operation(s) to VectorDB"
-                    else:
-                        result += f"\n[AUTO-SYNC] Synced with errors: {successful} successful, {failed} failed"
+                # Auto-sync to VectorDB after recording changes (only if RAG mode is available)
+                if CHROMADB_AVAILABLE:
+                    LOGGER.info("Auto-syncing to VectorDB after snap...")
+                    pending_count = memov_manager.get_pending_writes_count()
+                    if pending_count > 0:
+                        successful, failed = memov_manager.sync_to_vectordb()
+                        if failed == 0:
+                            result += f"\n[AUTO-SYNC] Successfully synced {successful} operation(s) to VectorDB"
+                        else:
+                            result += f"\n[AUTO-SYNC] Synced with errors: {successful} successful, {failed} failed"
 
                 LOGGER.info(f"Operation completed successfully: {result}")
                 return result
@@ -366,8 +371,60 @@ class MemMCPTools:
             return error_msg
 
 
+# RAG-dependent MCP tools (only registered when [rag] extras are installed)
+if CHROMADB_AVAILABLE:
+
     @staticmethod
-    @mcp.tool()
+    @MemMCPTools.mcp.tool()
+    def mem_sync() -> str:
+        """Sync all pending operations to VectorDB for semantic search capabilities.
+
+        **Purpose:**
+        This tool synchronizes your recorded interactions (prompts, responses, agent plans)
+        to the VectorDB, enabling semantic search through your code history.
+
+        **When to use:**
+        - After recording several interactions to make them searchable
+        - Before using vibe_search or vibe_debug tools
+        - Periodically to keep VectorDB up to date
+
+        **Requirements:**
+        - Requires [rag] extras: Install with `pip install memov[rag]`
+
+        Returns:
+            Sync result with number of operations synced
+        """
+        try:
+            LOGGER.info("mem_sync called")
+
+            if MemMCPTools._project_path is None:
+                raise ValueError("Project path is not set.")
+
+            if not os.path.exists(MemMCPTools._project_path):
+                raise ValueError(f"Project path '{MemMCPTools._project_path}' does not exist.")
+
+            memov_manager = MemovManager(project_path=MemMCPTools._project_path)
+
+            if (check_status := memov_manager.check()) is not MemStatus.SUCCESS:
+                return f"[ERROR] Memov not initialized: {check_status}. Run 'mem init' first."
+
+            pending_count = memov_manager.get_pending_writes_count()
+            if pending_count == 0:
+                return "[INFO] No pending operations to sync."
+
+            successful, failed = memov_manager.sync_to_vectordb()
+
+            if failed == 0:
+                return f"[SUCCESS] Synced {successful} operation(s) to VectorDB"
+            else:
+                return f"[PARTIAL] Synced with errors: {successful} successful, {failed} failed"
+
+        except Exception as e:
+            error_msg = f"[ERROR] Error in mem_sync: {str(e)}"
+            LOGGER.error(error_msg, exc_info=True)
+            return error_msg
+
+    @MemMCPTools.mcp.tool()
     def validate_commit(commit_hash: str, detailed: bool = True) -> str:
         """Validate a specific commit by comparing prompt/response with actual code changes.
 
@@ -390,6 +447,9 @@ class MemMCPTools:
         3. Compares expected files (from prompt) vs actual files changed
         4. Calculates alignment score (0.0-1.0) based on multiple factors
         5. Identifies issues and provides recommendations
+
+        **Requirements:**
+        - Requires [rag] extras: Install with `pip install memov[rag]`
 
         Args:
             commit_hash: The commit hash to validate (full or short form, e.g., "a1b2c3d")
@@ -507,8 +567,7 @@ class MemMCPTools:
             LOGGER.error(error_msg, exc_info=True)
             return error_msg
 
-    @staticmethod
-    @mcp.tool()
+    @MemMCPTools.mcp.tool()
     def validate_recent(n: int = 5) -> str:
         """Validate the N most recent commits for alignment with their prompts.
 
@@ -526,6 +585,9 @@ class MemMCPTools:
         - Summary statistics (total validated, aligned count, average score)
         - Individual validation results for each commit
         - Aggregate issues and recommendations
+
+        **Requirements:**
+        - Requires [rag] extras: Install with `pip install memov[rag]`
 
         Args:
             n: Number of recent commits to validate (default: 5, max: 20)
@@ -571,8 +633,7 @@ class MemMCPTools:
             LOGGER.error(error_msg, exc_info=True)
             return error_msg
 
-    @staticmethod
-    @mcp.tool()
+    @MemMCPTools.mcp.tool()
     def vibe_debug(
         query: str,
         error_message: str = "",
@@ -718,8 +779,7 @@ class MemMCPTools:
             LOGGER.error(error_msg, exc_info=True)
             return error_msg
 
-    @staticmethod
-    @mcp.tool()
+    @MemMCPTools.mcp.tool()
     def vibe_search(query: str, n_results: int = 5, content_type: str = "") -> str:
         """Search code history using RAG (without LLM analysis).
 
@@ -737,6 +797,9 @@ class MemMCPTools:
         - Locating code that handles similar functionality
         - Understanding when/why a file was changed
         - Quick historical context lookup
+
+        **Requirements:**
+        - Requires [rag] extras: Install with `pip install memov[rag]`
 
         Args:
             query: Search query (natural language)

@@ -105,6 +105,20 @@ Go to **Files > Preferences > Cursor Settings > MCP**, then add:
 }
 ```
 
+### With VectorDB (RAG mode)
+
+To enable semantic search, validation, and debugging tools, install with `[rag]` extras:
+
+**Claude Code:**
+```bash
+claude mcp add mem-mcp --scope project -- uvx --from "git+https://github.com/memovai/memov.git[rag]" mem stdio $(pwd)
+```
+
+**VS Code / Cursor:** Change the `--from` argument to:
+```
+"git+https://github.com/memovai/memov.git[rag]"
+```
+
 ## Installation for Contributors
 
 Please see [docs/installation_for_dev.md](docs/installation_for_dev.md) for detailed installation instructions.
@@ -118,10 +132,12 @@ These are available to MCP clients through the server:
 - `snap(user_prompt: str, original_response: str, agent_plan: list[str], files_changed: str)`
   - Record every user interaction with automatic file tracking. Handles untracked vs modified files intelligently.
 
+### RAG Tools (requires `[rag]` extras)
+
+These tools are only available when installed with `[rag]` extras.
+
 - `mem_sync()`
   - Sync all pending operations to VectorDB for semantic search capabilities.
-
-### Validation & Debugging
 
 - `validate_commit(commit_hash: str, detailed: bool = True)`
   - Validate a specific commit by comparing prompt/response with actual code changes. Detects context drift and alignment issues.

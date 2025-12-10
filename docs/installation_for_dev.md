@@ -12,7 +12,12 @@
    ```bash
    git clone git@github.com:memovai/memov.git
    cd memov
+
+   # Basic version (core features only)
    uv sync
+
+   # With VectorDB/RAG support (semantic search, validation, debugging)
+   uv sync --extra rag
    ```
 
 2. **Set up development tools:**
