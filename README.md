@@ -4,7 +4,7 @@
   </a>
 </p>
 
-# VibeGit: Auto-manage your prompts, plans, and code diffs.
+# VibeGit: Auto-manage your prompts, plans, and diffs.
 
 <div align="center">
 
@@ -14,13 +14,12 @@
 
 </div>
 
-MemoV = Prompt + Agent Plan + CodeDiff
+MemoV as VibeGit = Prompt + Agent Plan + CodeDiff, all under version control.
+VibeGit: A shadow `.mem` timeline alongside git — every interaction (prompt, plan, diff) captured before you commit.
 
 <p align="center">
   <img src="docs/images/readme.gif" alt="MemoV Demo" width="800px">
 </p>
-
-VibeGit: A shadow `.mem` timeline alongside git — every interaction (prompt, plan, diff) captured before you commit.
 
 - 💬 [Join our Discord](https://discord.gg/un54aD7Hug) and dive into smarter context engineering
 - 🌐 [Visit memov.ai](https://memov.ai) to visualize your coding memory and supercharge existing GitHub repos
@@ -35,7 +34,7 @@ VibeGit: A shadow `.mem` timeline alongside git — every interaction (prompt, p
 
 ## Features
 
-- 📒 **Context-bound memory**: Automatically track user code diffs, prompts, and agent plans — independent of .git.
+- 📒 **ContextGit memory**: Automatically track code diffs, prompts, and agent plans — independent of .git.
 - ⏪ **Fine-grained rollback**: Built on git, revert to a specific agent plan within a single commit
 - 🤝 **Team context sharing**: Real-time alignment with zero friction
 - ♻️ **Change reuse**: Reapply past code edits by description to save tokens when iterating on a feature
