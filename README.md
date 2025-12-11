@@ -123,14 +123,44 @@ Download the latest release for your platform:
 | Linux x86_64 | [mem-linux-x86_64.tar.gz](https://github.com/memovai/memov/releases/latest/download/mem-linux-x86_64.tar.gz) |
 | macOS Intel | [mem-macos-x86_64.tar.gz](https://github.com/memovai/memov/releases/latest/download/mem-macos-x86_64.tar.gz) |
 | macOS Apple Silicon | [mem-macos-arm64.tar.gz](https://github.com/memovai/memov/releases/latest/download/mem-macos-arm64.tar.gz) |
-| Windows | [mem-windows-x86_64.exe.zip](https://github.com/memovai/memov/releases/latest/download/mem-windows-x86_64.exe.zip) |
+| Windows x86_64 | [mem-windows-x86_64.exe.zip](https://github.com/memovai/memov/releases/latest/download/mem-windows-x86_64.exe.zip) |
+
+**Linux / macOS:**
 
 ```bash
-# Example for Linux
+# Download and extract (example for Linux)
+curl -LO https://github.com/memovai/memov/releases/latest/download/mem-linux-x86_64.tar.gz
 tar -xzf mem-linux-x86_64.tar.gz
 sudo mv mem-linux-x86_64 /usr/local/bin/mem
 mem --help
 ```
+
+**Windows (PowerShell):**
+
+```powershell
+# Download
+Invoke-WebRequest -Uri "https://github.com/memovai/memov/releases/latest/download/mem-windows-x86_64.exe.zip" -OutFile "mem.zip"
+
+# Extract
+Expand-Archive -Path "mem.zip" -DestinationPath "."
+
+# Move to a directory in your PATH (e.g., C:\Program Files\mem)
+New-Item -ItemType Directory -Force -Path "$env:ProgramFiles\mem"
+Move-Item -Path "mem-windows-x86_64.exe" -Destination "$env:ProgramFiles\mem\mem.exe"
+
+# Add to PATH (run as Administrator)
+[Environment]::SetEnvironmentVariable("Path", $env:Path + ";$env:ProgramFiles\mem", "Machine")
+
+# Verify (restart terminal first)
+mem --help
+```
+
+Or manually:
+1. Download [mem-windows-x86_64.exe.zip](https://github.com/memovai/memov/releases/latest/download/mem-windows-x86_64.exe.zip)
+2. Extract the ZIP file
+3. Rename `mem-windows-x86_64.exe` to `mem.exe`
+4. Move `mem.exe` to a folder in your PATH (e.g., `C:\Windows\System32` or create `C:\Program Files\mem`)
+5. Open a new terminal and run `mem --help`
 
 </details>
 

@@ -178,13 +178,17 @@ install_mem() {
 # Main
 main() {
     echo ""
-    echo "  __  __ _____ __  __ "
-    echo " |  \/  | ____|  \/  |"
-    echo " | |\/| |  _| | |\/| |"
-    echo " | |  | | |___| |  | |"
-    echo " |_|  |_|_____|_|  |_|"
+    echo "  ███╗   ███╗███████╗███╗   ███╗ ██████╗ ██╗   ██╗"
+    echo "  ████╗ ████║██╔════╝████╗ ████║██╔═══██╗██║   ██║"
+    echo "  ██╔████╔██║█████╗  ██╔████╔██║██║   ██║██║   ██║"
+    echo "  ██║╚██╔╝██║██╔══╝  ██║╚██╔╝██║██║   ██║╚██╗ ██╔╝"
+    echo "  ██║ ╚═╝ ██║███████╗██║ ╚═╝ ██║╚██████╔╝ ╚████╔╝ "
+    echo "  ╚═╝     ╚═╝╚══════╝╚═╝     ╚═╝ ╚═════╝   ╚═══╝  "
     echo ""
-    echo " Memory layer for AI coding agents"
+    echo "  MemoV = Prompt + Agent Plan + CodeDiff"
+    echo "  All auto-captured as you flow."
+    echo ""
+    echo "  Traceable memory for AI coding agents."
     echo ""
 
     install_mem
