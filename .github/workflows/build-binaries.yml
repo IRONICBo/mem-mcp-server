@@ -13,46 +13,36 @@ on:
 
 jobs:
   build:
-    name: Build ${{ matrix.mode }} on ${{ matrix.os }}
+    name: Build on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        mode: [basic, rag]
         include:
-          # Linux builds
           - os: ubuntu-latest
             platform: linux
             arch: x86_64
             artifact_name: mem
-          # macOS Intel builds
-          - os: macos-latest
+            asset_name: mem-linux-x86_64
+          - os: macos-15
             platform: macos
             arch: x86_64
             artifact_name: mem
-          # macOS ARM builds
+            asset_name: mem-macos-x86_64
+            target_arch: x86_64
           - os: macos-latest
             platform: macos
             arch: arm64
             artifact_name: mem
-          # Windows builds
+            asset_name: mem-macos-arm64
           - os: windows-latest
             platform: windows
             arch: x86_64
             artifact_name: mem.exe
+            asset_name: mem-windows-x86_64.exe
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Set asset names
-        id: set-names
-        shell: bash
-        run: |
-          if [ "${{ matrix.platform }}" = "windows" ]; then
-            echo "asset_name=mem-${{ matrix.mode }}-${{ matrix.platform }}-${{ matrix.arch }}.exe" >> $GITHUB_OUTPUT
-          else
-            echo "asset_name=mem-${{ matrix.mode }}-${{ matrix.platform }}-${{ matrix.arch }}" >> $GITHUB_OUTPUT
-          fi
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -64,34 +54,40 @@ jobs:
         with:
           version: "latest"
 
-      - name: Install dependencies (basic mode)
-        if: matrix.mode == 'basic'
+      - name: Install dependencies
         run: |
           uv pip install --system pyinstaller
           uv pip install --system .
 
-      - name: Install dependencies (rag mode)
-        if: matrix.mode == 'rag'
-        run: |
-          uv pip install --system pyinstaller
-          uv pip install --system ".[rag]"
-          # Force NumPy 1.26.x for PyInstaller macOS compatibility
-          uv pip install --system "numpy>=1.26.0,<2.0.0"
-
-      - name: Build binary with PyInstaller (Linux/macOS)
-        if: matrix.platform != 'windows'
+      - name: Build binary with PyInstaller (Linux/macOS ARM64)
+        if: matrix.platform != 'windows' && matrix.target_arch != 'x86_64'
         run: |
           pyinstaller --onefile \
             --name ${{ matrix.artifact_name }} \
             --hidden-import=memov.core \
             --hidden-import=memov.utils \
             --hidden-import=memov.storage \
-            --hidden-import=chromadb \
-            --hidden-import=litellm \
-            --collect-all chromadb \
-            --collect-all litellm \
             --noconfirm \
             memov/main.py
+
+      - name: Build binary with PyInstaller (macOS x86_64 cross-compile)
+        if: matrix.platform == 'macos' && matrix.target_arch == 'x86_64'
+        run: |
+          # Install x86_64 Python via Rosetta 2
+          arch -x86_64 /bin/bash -c "
+            curl -LsSf https://astral.sh/uv/install.sh | sh
+            source \$HOME/.local/bin/env
+            uv python install 3.12
+            uv pip install --system pyinstaller
+            uv pip install --system .
+            pyinstaller --onefile \
+              --name ${{ matrix.artifact_name }} \
+              --hidden-import=memov.core \
+              --hidden-import=memov.utils \
+              --hidden-import=memov.storage \
+              --noconfirm \
+              memov/main.py
+          "
 
       - name: Build binary with PyInstaller (Windows)
         if: matrix.platform == 'windows'
@@ -101,18 +97,20 @@ jobs:
             --hidden-import=memov.core `
             --hidden-import=memov.utils `
             --hidden-import=memov.storage `
-            --hidden-import=chromadb `
-            --hidden-import=litellm `
-            --collect-all chromadb `
-            --collect-all litellm `
             --noconfirm `
             memov/main.py
 
-      - name: Test binary (Linux/macOS)
-        if: matrix.platform != 'windows'
+      - name: Test binary (Linux/macOS native)
+        if: matrix.platform != 'windows' && matrix.target_arch != 'x86_64'
         run: |
           chmod +x dist/${{ matrix.artifact_name }}
           dist/${{ matrix.artifact_name }} --help
+
+      - name: Test binary (macOS x86_64 via Rosetta)
+        if: matrix.platform == 'macos' && matrix.target_arch == 'x86_64'
+        run: |
+          chmod +x dist/${{ matrix.artifact_name }}
+          arch -x86_64 dist/${{ matrix.artifact_name }} --help
 
       - name: Test binary (Windows)
         if: matrix.platform == 'windows'
@@ -122,37 +120,37 @@ jobs:
       - name: Rename artifact
         if: matrix.platform != 'windows'
         run: |
-          mv dist/${{ matrix.artifact_name }} dist/${{ steps.set-names.outputs.asset_name }}
+          mv dist/${{ matrix.artifact_name }} dist/${{ matrix.asset_name }}
 
       - name: Rename artifact (Windows)
         if: matrix.platform == 'windows'
         run: |
-          Move-Item dist\${{ matrix.artifact_name }} dist\${{ steps.set-names.outputs.asset_name }}
+          Move-Item dist\${{ matrix.artifact_name }} dist\${{ matrix.asset_name }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ steps.set-names.outputs.asset_name }}
-          path: dist/${{ steps.set-names.outputs.asset_name }}
+          name: ${{ matrix.asset_name }}
+          path: dist/${{ matrix.asset_name }}
           retention-days: 7
 
       - name: Create tarball (Linux/macOS)
         if: matrix.platform != 'windows' && startsWith(github.ref, 'refs/tags/')
         run: |
           cd dist
-          tar -czf ${{ steps.set-names.outputs.asset_name }}.tar.gz ${{ steps.set-names.outputs.asset_name }}
+          tar -czf ${{ matrix.asset_name }}.tar.gz ${{ matrix.asset_name }}
 
       - name: Create zip (Windows)
         if: matrix.platform == 'windows' && startsWith(github.ref, 'refs/tags/')
         run: |
           cd dist
-          Compress-Archive -Path ${{ steps.set-names.outputs.asset_name }} -DestinationPath ${{ steps.set-names.outputs.asset_name }}.zip
+          Compress-Archive -Path ${{ matrix.asset_name }} -DestinationPath ${{ matrix.asset_name }}.zip
 
       - name: Upload Release Asset (Linux/macOS)
         if: matrix.platform != 'windows' && startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v1
         with:
-          files: dist/${{ steps.set-names.outputs.asset_name }}.tar.gz
+          files: dist/${{ matrix.asset_name }}.tar.gz
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -160,7 +158,7 @@ jobs:
         if: matrix.platform == 'windows' && startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v1
         with:
-          files: dist/${{ steps.set-names.outputs.asset_name }}.zip
+          files: dist/${{ matrix.asset_name }}.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -176,51 +174,27 @@ jobs:
           body: |
             ## Binary Downloads
 
-            ### Build Modes
-
-            **Basic Mode** (`mem-basic-*`): Lightweight build with core version control features only (~10-20MB)
-            - Commands: init, track, snap, rename, remove, history, show, jump, status, amend, version, report
-
-            **RAG Mode** (`mem-rag-*`): Full-featured build with semantic search capabilities (~100-150MB)
-            - All basic commands + sync, search (requires ChromaDB)
-
-            ---
+            Download the appropriate binary for your platform:
 
             ### Linux
-
-            **Basic:**
-            - [mem-basic-linux-x86_64.tar.gz](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/mem-basic-linux-x86_64.tar.gz)
-
-            **RAG:**
-            - [mem-rag-linux-x86_64.tar.gz](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/mem-rag-linux-x86_64.tar.gz)
+            - [mem-linux-x86_64.tar.gz](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/mem-linux-x86_64.tar.gz)
 
             ### macOS
-
-            **Basic:**
-            - [mem-basic-macos-x86_64.tar.gz](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/mem-basic-macos-x86_64.tar.gz) (Intel)
-            - [mem-basic-macos-arm64.tar.gz](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/mem-basic-macos-arm64.tar.gz) (Apple Silicon)
-
-            **RAG:**
-            - [mem-rag-macos-x86_64.tar.gz](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/mem-rag-macos-x86_64.tar.gz) (Intel)
-            - [mem-rag-macos-arm64.tar.gz](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/mem-rag-macos-arm64.tar.gz) (Apple Silicon)
+            - [mem-macos-x86_64.tar.gz](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/mem-macos-x86_64.tar.gz) (Intel)
+            - [mem-macos-arm64.tar.gz](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/mem-macos-arm64.tar.gz) (Apple Silicon)
 
             ### Windows
-
-            **Basic:**
-            - [mem-basic-windows-x86_64.exe.zip](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/mem-basic-windows-x86_64.exe.zip)
-
-            **RAG:**
-            - [mem-rag-windows-x86_64.exe.zip](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/mem-rag-windows-x86_64.exe.zip)
+            - [mem-windows-x86_64.exe.zip](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/mem-windows-x86_64.exe.zip)
 
             ## Installation
 
             ### Linux / macOS
             ```bash
-            # Download and extract (replace <mode> with 'basic' or 'rag')
-            tar -xzf mem-<mode>-<platform>-<arch>.tar.gz
+            # Download and extract
+            tar -xzf mem-<platform>-<arch>.tar.gz
 
             # Move to PATH
-            sudo mv mem-<mode>-<platform>-<arch> /usr/local/bin/mem
+            sudo mv mem-<platform>-<arch> /usr/local/bin/mem
 
             # Verify installation
             mem --help
@@ -229,7 +203,7 @@ jobs:
             ### Windows
             ```powershell
             # Extract the zip file
-            # Move mem-<mode>-windows-x86_64.exe to a directory in your PATH
+            # Move mem-windows-x86_64.exe to a directory in your PATH
             # Or add the directory to your PATH environment variable
 
             # Verify installation

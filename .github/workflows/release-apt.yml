@@ -1,0 +1,188 @@
+name: Release to APT Repository
+
+on:
+  workflow_run:
+    workflows: ["Build Binary Releases"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 0.0.1-test)'
+        required: true
+
+env:
+  PAGES_BRANCH: gh-pages
+
+jobs:
+  build-deb:
+    name: Build DEB package
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check workflow run status
+        if: github.event_name == 'workflow_run'
+        run: |
+          if [ "${{ github.event.workflow_run.conclusion }}" != "success" ]; then
+            echo "Build workflow failed, skipping release"
+            exit 1
+          fi
+
+      - name: Get version
+        id: version
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            # Get latest release version
+            VERSION=$(gh release list --repo "${{ github.repository }}" --limit 1 --json tagName -q '.[0].tagName')
+            VERSION="${VERSION#v}"
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION"
+
+      - name: Download release binary
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          REPO="${{ github.repository }}"
+          ASSET_NAME="mem-linux-x86_64.tar.gz"
+
+          echo "Downloading ${ASSET_NAME} from release v${VERSION}..."
+          gh release download "v${VERSION}" --repo "${REPO}" --pattern "${ASSET_NAME}"
+
+          ls -la "${ASSET_NAME}"
+          file "${ASSET_NAME}"
+
+          tar -xzf "${ASSET_NAME}"
+          chmod +x mem-linux-x86_64
+
+      - name: Build DEB package
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          PKG_NAME="mem"
+          ARCH="amd64"
+
+          PKG_DIR="${PKG_NAME}_${VERSION}_${ARCH}"
+          mkdir -p "${PKG_DIR}/DEBIAN"
+          mkdir -p "${PKG_DIR}/usr/bin"
+          mkdir -p "${PKG_DIR}/usr/share/doc/${PKG_NAME}"
+
+          cp "mem-linux-x86_64" "${PKG_DIR}/usr/bin/mem"
+          chmod 755 "${PKG_DIR}/usr/bin/mem"
+
+          cat > "${PKG_DIR}/DEBIAN/control" << EOF
+          Package: ${PKG_NAME}
+          Version: ${VERSION}
+          Section: devel
+          Priority: optional
+          Architecture: ${ARCH}
+          Maintainer: Memov Team <contact@memov.dev>
+          Homepage: https://github.com/${{ github.repository }}
+          Description: AI-powered version control tool - memory layer for AI coding agents
+          EOF
+
+          dpkg-deb --build "${PKG_DIR}"
+
+      - name: Upload DEB artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: deb-amd64
+          path: "*.deb"
+          retention-days: 7
+
+  publish-apt-repo:
+    name: Publish APT Repository
+    needs: build-deb
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download DEB artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: deb-amd64
+          path: debs/
+
+      - name: Checkout gh-pages branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.PAGES_BRANCH }}
+          path: gh-pages
+        continue-on-error: true
+
+      - name: Initialize gh-pages if not exists
+        run: |
+          if [ ! -d "gh-pages/.git" ]; then
+            mkdir -p gh-pages
+            cd gh-pages
+            git init
+            git checkout -b ${{ env.PAGES_BRANCH }}
+          fi
+
+      - name: Setup APT repository structure
+        run: |
+          mkdir -p gh-pages/apt/pool/main/m/mem
+          mkdir -p gh-pages/apt/dists/stable/main/binary-amd64
+          cp debs/*.deb gh-pages/apt/pool/main/m/mem/
+
+      - name: Generate APT repository metadata
+        run: |
+          cd gh-pages/apt
+          apt-ftparchive packages pool/main > dists/stable/main/binary-amd64/Packages
+          gzip -k -f dists/stable/main/binary-amd64/Packages
+
+          cat > dists/stable/Release << EOF
+          Origin: MEM
+          Label: MEM
+          Suite: stable
+          Codename: stable
+          Architectures: amd64
+          Components: main
+          Description: MEM APT Repository
+          EOF
+          apt-ftparchive release dists/stable >> dists/stable/Release
+
+      - name: Create index page
+        run: |
+          PAGES_URL="${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
+          cat > gh-pages/index.html << EOF
+          <!DOCTYPE html>
+          <html>
+          <head><title>MEM Package Repository</title></head>
+          <body>
+            <h1>MEM Package Repository</h1>
+
+            <h2>APT (Debian/Ubuntu)</h2>
+            <pre>
+          echo "deb [trusted=yes] https://${PAGES_URL}/apt stable main" | sudo tee /etc/apt/sources.list.d/mem.list
+          sudo apt update
+          sudo apt install mem
+            </pre>
+
+            <h2>YUM/DNF (Fedora/RHEL)</h2>
+            <pre>
+          sudo curl -o /etc/yum.repos.d/mem.repo https://${PAGES_URL}/yum/mem.repo
+          sudo dnf install mem
+            </pre>
+          </body>
+          </html>
+          EOF
+
+      - name: Commit and push
+        run: |
+          cd gh-pages
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --staged --quiet; then
+            echo "No changes to commit"
+          else
+            git commit -m "Update APT repository"
+            git push origin ${{ env.PAGES_BRANCH }} --force
+          fi
