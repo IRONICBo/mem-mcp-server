@@ -21,9 +21,12 @@ def subprocess_call(
             "check": True,
             "stdout": subprocess.PIPE,
             "stderr": subprocess.PIPE,
-            "encoding": "utf-8",
             "text": text,
         }
+
+        # Only set encoding when text mode is True
+        if text:
+            kwargs["encoding"] = "utf-8"
 
         if input is not None:
             kwargs["input"] = input
