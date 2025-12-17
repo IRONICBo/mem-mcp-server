@@ -315,6 +315,14 @@ class MemovManager:
             MemStatus indicating success or failure
         """
         try:
+            # Check if we're on a branch (not detached)
+            branches = self._load_branches()
+            if branches and branches.get("current") is None:
+                LOGGER.error(
+                    "Not on any branch. Use 'mem switch <branch>' to create or switch to a branch first."
+                )
+                return MemStatus.UNKNOWN_ERROR
+
             # Get all tracked files in the memov repo and their previous blob hashes
             tracked_file_rel_paths, tracked_file_abs_paths = [], []
             head_commit = GitManager.get_commit_id_by_ref(
@@ -985,6 +993,97 @@ class MemovManager:
             i += 1
         return f"develop/{i}"
 
+    def list_branches(self) -> MemStatus:
+        """List all branches, marking current with *."""
+        branches = self._load_branches()
+        if not branches:
+            LOGGER.warning("No branches found. Run 'mem init' first.")
+            return MemStatus.BARE_REPO_NOT_FOUND
+
+        current = branches.get("current")
+        for name, commit in branches["branches"].items():
+            prefix = "* " if name == current else "  "
+            LOGGER.info(f"{prefix}{name} -> {commit[:7]}")
+        return MemStatus.SUCCESS
+
+    def create_branch(self, name: str) -> MemStatus:
+        """Create a new branch at current HEAD."""
+        branches = self._load_branches()
+        if not branches:
+            LOGGER.warning("No branches config found. Run 'mem init' first.")
+            return MemStatus.BARE_REPO_NOT_FOUND
+
+        if name in branches["branches"]:
+            LOGGER.warning(f"Branch '{name}' already exists.")
+            return MemStatus.UNKNOWN_ERROR
+
+        head_commit = GitManager.get_commit_id_by_ref(
+            self.bare_repo_path, "refs/memov/HEAD", verbose=False
+        )
+        if not head_commit:
+            LOGGER.error("No HEAD commit found.")
+            return MemStatus.UNKNOWN_ERROR
+
+        branches["branches"][name] = head_commit
+        self._save_branches(branches)
+        LOGGER.info(f"Created branch '{name}' at {head_commit[:7]}")
+        return MemStatus.SUCCESS
+
+    def delete_branch(self, name: str) -> MemStatus:
+        """Delete a branch."""
+        branches = self._load_branches()
+        if not branches:
+            LOGGER.warning("No branches config found. Run 'mem init' first.")
+            return MemStatus.BARE_REPO_NOT_FOUND
+
+        if name not in branches["branches"]:
+            LOGGER.warning(f"Branch '{name}' does not exist.")
+            return MemStatus.UNKNOWN_ERROR
+
+        if name == branches.get("current"):
+            LOGGER.error(f"Cannot delete current branch '{name}'.")
+            return MemStatus.UNKNOWN_ERROR
+
+        if name == "main":
+            LOGGER.error("Cannot delete 'main' branch.")
+            return MemStatus.UNKNOWN_ERROR
+
+        del branches["branches"][name]
+        self._save_branches(branches)
+        LOGGER.info(f"Deleted branch '{name}'")
+        return MemStatus.SUCCESS
+
+    def switch_branch(self, name: str) -> MemStatus:
+        """Switch to a branch (lightweight, no file changes). Creates branch if it doesn't exist."""
+        branches = self._load_branches()
+        if not branches:
+            LOGGER.warning("No branches config found. Run 'mem init' first.")
+            return MemStatus.BARE_REPO_NOT_FOUND
+
+        # If branch doesn't exist, create it at current HEAD
+        created_new = False
+        if name not in branches["branches"]:
+            head_commit = GitManager.get_commit_id_by_ref(
+                self.bare_repo_path, "refs/memov/HEAD", verbose=False
+            )
+            if not head_commit:
+                LOGGER.error("No HEAD commit found.")
+                return MemStatus.UNKNOWN_ERROR
+            branches["branches"][name] = head_commit
+            created_new = True
+
+        target_commit = branches["branches"][name]
+        branches["current"] = name
+        self._save_branches(branches)
+        GitManager.update_ref(self.bare_repo_path, "refs/memov/HEAD", target_commit)
+
+        # Log after save succeeds to avoid inconsistency
+        if created_new:
+            LOGGER.info(f"Created and switched to branch '{name}' at {target_commit[:7]}")
+        else:
+            LOGGER.info(f"Switched to branch '{name}'")
+        return MemStatus.SUCCESS
+
     def _load_memignore(self) -> pathspec.PathSpec:
         """Load .memignore rules and return a pathspec.PathSpec object"""
         patterns = []
@@ -1061,28 +1160,11 @@ class MemovManager:
                 branches["branches"][current_branch] = new_commit
                 LOGGER.debug(f"Updated current branch {current_branch} to {new_commit}")
             else:
-                # If no current branch, try to find matching branch
-                updated = False
-                for name, commit_hash in branches["branches"].items():
-                    if head_commit == commit_hash:
-                        branches["branches"][name] = new_commit
-                        branches["current"] = name
-                        updated = True
-                        LOGGER.debug(f"Found matching branch {name}, updated to {new_commit}")
-                        break
-
-                # Only create new branch when no match is found
-                if not updated:
-                    # Check if it's main branch case (empty or invalid commit hash)
-                    if "main" in branches["branches"] and not branches["branches"]["main"]:
-                        branches["branches"]["main"] = new_commit
-                        branches["current"] = "main"
-                        LOGGER.debug(f"Fixed empty main branch, set to {new_commit}")
-                    else:
-                        new_branch = self._next_develop_branch(branches["branches"])
-                        branches["branches"][new_branch] = new_commit
-                        branches["current"] = new_branch
-                        LOGGER.warning(f"Created new branch {new_branch} for commit {new_commit}")
+                # No current branch - this should not happen if snapshot() checks for detached state
+                # Just log a warning and don't create automatic branches
+                LOGGER.warning(
+                    f"No current branch set. Commit {new_commit} created but not associated with any branch."
+                )
 
         # Update the branches config file and the HEAD reference
         self._save_branches(branches)
@@ -1297,9 +1379,7 @@ class MemovManager:
             LOGGER.error(f"Error finding similar prompts: {e}")
             return []
 
-    def find_commits_by_prompt(
-        self, query_prompt: str, n_results: int = 5
-    ) -> list[str]:
+    def find_commits_by_prompt(self, query_prompt: str, n_results: int = 5) -> list[str]:
         """
         Find commit IDs with prompts similar to the query.
 
@@ -1412,9 +1492,7 @@ class MemovManager:
                 parent_commit = commit_history[-2]  # Second-to-last commit is the parent
 
             # Get diff output using git show
-            diff_output = GitManager.git_show(
-                self.bare_repo_path, head_commit, return_output=True
-            )
+            diff_output = GitManager.git_show(self.bare_repo_path, head_commit, return_output=True)
 
             # Get tracked files in this commit
             tracked_files, _ = GitManager.get_files_by_commit(self.bare_repo_path, head_commit)

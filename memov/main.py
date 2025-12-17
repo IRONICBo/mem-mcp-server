@@ -160,6 +160,32 @@ def jump(
 
 
 @app.command()
+def branch(
+    name: Annotated[Optional[str], typer.Argument(help="Branch name to create")] = None,
+    delete: Annotated[Optional[str], typer.Option("-d", "--delete", help="Delete branch")] = None,
+    loc: LocOption = ".",
+) -> None:
+    """List, create, or delete branches."""
+    manager = get_manager(loc)
+    if delete:
+        manager.delete_branch(delete)
+    elif name:
+        manager.create_branch(name)
+    else:
+        manager.list_branches()
+
+
+@app.command()
+def switch(
+    branch_name: Annotated[str, typer.Argument(help="Branch to switch to (creates if not exists)")],
+    loc: LocOption = ".",
+) -> None:
+    """Switch to a branch (does not change files). Creates branch if it doesn't exist."""
+    manager = get_manager(loc)
+    manager.switch_branch(branch_name)
+
+
+@app.command()
 def status(loc: LocOption = ".") -> None:
     """Show status of working directory compared to the latest snapshot."""
     manager = get_manager(loc)
@@ -242,7 +268,7 @@ def report(
         console.print(f"  Source: {report_data['metadata']['source'] or 'N/A'}")
         console.print(f"  Files: {', '.join(report_data['metadata']['files']) or 'N/A'}")
         console.print(f"\n[bold]Diff:[/bold]")
-        console.print(report_data['diff'])
+        console.print(report_data["diff"])
     else:
         console.print(f"[red]Unsupported format: {format}[/red]")
         sys.exit(1)

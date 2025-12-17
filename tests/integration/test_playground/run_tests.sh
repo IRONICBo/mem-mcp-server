@@ -252,5 +252,81 @@ OUTPUT=$(uv run --directory "$MEMOV_ROOT" mem amend --loc "$PROJECT_DIR" "$FIRST
 check_output_for_errors "$OUTPUT"
 print_success "Amend command works"
 
+print_section "Stage 9: Branch Management"
+
+print_step "9.1: List branches"
+OUTPUT=$(uv run --directory "$MEMOV_ROOT" mem branch --loc "$PROJECT_DIR" 2>&1)
+echo "$OUTPUT" | grep "\* main" > /dev/null && print_success "Current branch is main"
+
+print_step "9.2: Create branch"
+uv run --directory "$MEMOV_ROOT" mem branch feature --loc "$PROJECT_DIR"
+OUTPUT=$(uv run --directory "$MEMOV_ROOT" mem branch --loc "$PROJECT_DIR" 2>&1)
+echo "$OUTPUT" | grep "feature" > /dev/null && print_success "Branch 'feature' created"
+
+print_step "9.3: Switch branch (no file change)"
+BEFORE_CONTENT=$(cat README.md)
+uv run --directory "$MEMOV_ROOT" mem switch feature --loc "$PROJECT_DIR"
+AFTER_CONTENT=$(cat README.md)
+if [ "$BEFORE_CONTENT" = "$AFTER_CONTENT" ]; then
+    print_success "Files unchanged after switch"
+else
+    print_error "Files should not change on switch"
+    exit 1
+fi
+
+print_step "9.4: Snap on new branch"
+echo "Feature branch change" >> README.md
+uv run --directory "$MEMOV_ROOT" mem snap --loc "$PROJECT_DIR" -p "Feature snap" -r "On feature branch"
+OUTPUT=$(uv run --directory "$MEMOV_ROOT" mem branch --loc "$PROJECT_DIR" 2>&1)
+echo "$OUTPUT" | grep "\* feature" > /dev/null && print_success "Snapped on feature branch"
+
+print_step "9.5: Jump to commit (detached)"
+FIRST_COMMIT=$(uv run --directory "$MEMOV_ROOT" mem history --loc "$PROJECT_DIR" 2>&1 | grep -oE '[a-f0-9]{7}' | tail -1)
+uv run --directory "$MEMOV_ROOT" mem jump "$FIRST_COMMIT" --loc "$PROJECT_DIR"
+OUTPUT=$(uv run --directory "$MEMOV_ROOT" mem branch --loc "$PROJECT_DIR" 2>&1)
+if ! echo "$OUTPUT" | grep "^\*" > /dev/null; then
+    print_success "Detached HEAD (no current branch marked)"
+else
+    print_error "Should be in detached state"
+    exit 1
+fi
+
+print_step "9.6: Snap in detached state should fail"
+if uv run --directory "$MEMOV_ROOT" mem snap --loc "$PROJECT_DIR" 2>&1 | grep -i "not on any branch"; then
+    print_success "Snap correctly rejected in detached state"
+else
+    print_error "Snap should fail in detached state"
+    exit 1
+fi
+
+print_step "9.7: Switch to new branch then snap"
+uv run --directory "$MEMOV_ROOT" mem switch experiment --loc "$PROJECT_DIR"
+echo "Experiment change" >> README.md
+uv run --directory "$MEMOV_ROOT" mem snap --loc "$PROJECT_DIR" -p "Experiment" -r "After switch"
+print_success "Can snap after switching to branch"
+
+print_step "9.8: Switch back to main"
+uv run --directory "$MEMOV_ROOT" mem switch main --loc "$PROJECT_DIR"
+OUTPUT=$(uv run --directory "$MEMOV_ROOT" mem branch --loc "$PROJECT_DIR" 2>&1)
+echo "$OUTPUT" | grep "\* main" > /dev/null && print_success "Switched to main branch"
+
+print_step "9.9: Delete branch"
+uv run --directory "$MEMOV_ROOT" mem branch -d feature --loc "$PROJECT_DIR"
+OUTPUT=$(uv run --directory "$MEMOV_ROOT" mem branch --loc "$PROJECT_DIR" 2>&1)
+if ! echo "$OUTPUT" | grep "feature" > /dev/null; then
+    print_success "Branch 'feature' deleted"
+else
+    print_error "Branch should be deleted"
+    exit 1
+fi
+
+print_step "9.10: Cannot delete main"
+if uv run --directory "$MEMOV_ROOT" mem branch -d main --loc "$PROJECT_DIR" 2>&1 | grep -i "cannot"; then
+    print_success "Cannot delete main branch"
+else
+    print_error "Should not be able to delete main"
+    exit 1
+fi
+
 print_section "Test Complete!"
 echo -e "${GREEN}All integration tests passed successfully!${NC}\n"
