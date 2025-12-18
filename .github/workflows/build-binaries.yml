@@ -223,6 +223,13 @@ jobs:
 
             ## Quick Install (Recommended)
 
+            ### Homebrew (macOS/Linux)
+            ```bash
+            brew tap memovai/mem
+            brew install memov
+            ```
+
+            ### Shell Script
             ```bash
             curl -fsSL https://raw.githubusercontent.com/memovai/memov/main/install.sh | bash
             ```
