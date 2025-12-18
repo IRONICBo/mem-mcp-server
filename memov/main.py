@@ -1,17 +1,31 @@
 import logging
 import os
 import sys
-from typing import List, Optional
+from typing import TYPE_CHECKING, List, Optional
 
 import typer
-from rich.console import Console
-from rich.table import Table
 from typing_extensions import Annotated
 
-from memov.core.manager import MemovManager, MemStatus
-from memov.utils.logging_utils import setup_logging
+# Lazy imports for faster startup - only import heavy modules when needed
+# These imports are deferred until get_manager() is called
+if TYPE_CHECKING:
+    from memov.core.manager import MemovManager, MemStatus
+    from rich.console import Console
 
-console = Console()
+# Lazy console initialization
+_console: Optional["Console"] = None
+
+
+def get_console() -> "Console":
+    """Get or create the Rich console (lazy initialization)."""
+    global _console
+    if _console is None:
+        from rich.console import Console
+
+        _console = Console()
+    return _console
+
+
 
 # Common type aliases
 LocOption = Annotated[
@@ -48,8 +62,16 @@ app = typer.Typer(
 )
 
 
-def get_manager(loc: str, skip_mem_check: bool = False) -> MemovManager:
-    """Get MemovManager instance, and config the logging."""
+def get_manager(loc: str, skip_mem_check: bool = False) -> "MemovManager":
+    """Get MemovManager instance, and config the logging.
+
+    This function uses lazy imports to speed up CLI startup time.
+    Heavy modules (MemovManager, logging utils) are only imported when needed.
+    """
+    # Lazy import: only load these when actually creating a manager
+    from memov.core.manager import MemovManager, MemStatus
+    from memov.utils.logging_utils import setup_logging
+
     # Configure logging
     setup_logging(loc)
 
@@ -248,7 +270,7 @@ def report(
     report_data = manager.report(format=format)
 
     if report_data is None:
-        console.print("[yellow]No commits found in memov repository[/yellow]")
+        get_console().print("[yellow]No commits found in memov repository[/yellow]")
         sys.exit(1)
 
     # Output based on format
@@ -257,6 +279,7 @@ def report(
         print(json.dumps(report_data, indent=2, ensure_ascii=False))
     elif format == "text":
         # Output as human-readable text
+        console = get_console()
         console.print(f"[bold cyan]Commit Report[/bold cyan]")
         console.print(f"[bold]Commit Hash:[/bold] {report_data['commit_hash']}")
         console.print(f"[bold]Branch:[/bold] {report_data['branch'] or 'N/A'}")
@@ -270,7 +293,7 @@ def report(
         console.print(f"\n[bold]Diff:[/bold]")
         console.print(report_data["diff"])
     else:
-        console.print(f"[red]Unsupported format: {format}[/red]")
+        get_console().print(f"[red]Unsupported format: {format}[/red]")
         sys.exit(1)
 
 
@@ -288,6 +311,8 @@ def sync(loc: LocOption = ".") -> None:
         mem sync  # Write all pending operations to VectorDB
     """
     manager = get_manager(loc)
+
+    console = get_console()
 
     # Check if RAG mode is available
     if not manager.is_rag_available():
@@ -378,6 +403,7 @@ def search(
         mem search "database" --limit 5 --show-distance
     """
     manager = get_manager(loc)
+    console = get_console()
 
     # Check if RAG mode is available
     if not manager.is_rag_available():
@@ -416,7 +442,9 @@ def search(
                 console.print(f"[yellow]No similar prompts found for: {query}[/yellow]")
                 return
 
-        # Create rich table
+        # Create rich table (lazy import)
+        from rich.table import Table
+
         table = Table(title=f"Search Results for: {query}", show_header=True, header_style="bold")
 
         # Add columns

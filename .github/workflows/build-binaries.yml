@@ -62,13 +62,32 @@ jobs:
       - name: Build binary with PyInstaller (Linux/macOS ARM64)
         if: matrix.platform != 'windows' && matrix.target_arch != 'x86_64'
         run: |
-          pyinstaller --onefile \
-            --name ${{ matrix.artifact_name }} \
-            --hidden-import=memov.core \
-            --hidden-import=memov.utils \
-            --hidden-import=memov.storage \
-            --noconfirm \
-            memov/main.py
+          # Use onedir mode for faster startup (especially on macOS)
+          # onefile mode is ~5-10x slower due to extraction overhead
+          if [ -f "mem.spec" ]; then
+            ONEFILE=0 pyinstaller mem.spec --noconfirm
+          else
+            pyinstaller --onedir \
+              --name mem \
+              --strip \
+              --hidden-import=memov.core \
+              --hidden-import=memov.core.manager \
+              --hidden-import=memov.core.git \
+              --hidden-import=memov.utils \
+              --hidden-import=memov.storage \
+              --hidden-import=typer \
+              --hidden-import=click \
+              --hidden-import=rich \
+              --hidden-import=pathspec \
+              --exclude-module pytest \
+              --exclude-module unittest \
+              --exclude-module IPython \
+              --exclude-module matplotlib \
+              --exclude-module chromadb \
+              --exclude-module litellm \
+              --noconfirm \
+              memov/main.py
+          fi
 
       - name: Build binary with PyInstaller (macOS x86_64 cross-compile)
         if: matrix.platform == 'macos' && matrix.target_arch == 'x86_64'
@@ -80,11 +99,23 @@ jobs:
             uv python install 3.12
             uv pip install --system pyinstaller
             uv pip install --system .
-            pyinstaller --onefile \
-              --name ${{ matrix.artifact_name }} \
+            # Use onedir mode for faster startup
+            pyinstaller --onedir \
+              --name mem \
+              --strip \
               --hidden-import=memov.core \
+              --hidden-import=memov.core.manager \
+              --hidden-import=memov.core.git \
               --hidden-import=memov.utils \
               --hidden-import=memov.storage \
+              --hidden-import=typer \
+              --hidden-import=click \
+              --hidden-import=rich \
+              --hidden-import=pathspec \
+              --exclude-module pytest \
+              --exclude-module unittest \
+              --exclude-module chromadb \
+              --exclude-module litellm \
               --noconfirm \
               memov/main.py
           "
@@ -92,59 +123,63 @@ jobs:
       - name: Build binary with PyInstaller (Windows)
         if: matrix.platform == 'windows'
         run: |
-          pyinstaller --onefile `
-            --name ${{ matrix.artifact_name }} `
+          # Use onedir mode for faster startup
+          pyinstaller --onedir `
+            --name mem `
             --hidden-import=memov.core `
+            --hidden-import=memov.core.manager `
+            --hidden-import=memov.core.git `
             --hidden-import=memov.utils `
             --hidden-import=memov.storage `
+            --hidden-import=typer `
+            --hidden-import=click `
+            --hidden-import=rich `
+            --hidden-import=pathspec `
+            --exclude-module pytest `
+            --exclude-module unittest `
+            --exclude-module chromadb `
+            --exclude-module litellm `
             --noconfirm `
             memov/main.py
 
       - name: Test binary (Linux/macOS native)
         if: matrix.platform != 'windows' && matrix.target_arch != 'x86_64'
         run: |
-          chmod +x dist/${{ matrix.artifact_name }}
-          dist/${{ matrix.artifact_name }} --help
+          # onedir mode creates dist/mem/mem
+          chmod +x dist/mem/mem
+          dist/mem/mem --help
+          dist/mem/mem version || true
 
       - name: Test binary (macOS x86_64 via Rosetta)
         if: matrix.platform == 'macos' && matrix.target_arch == 'x86_64'
         run: |
-          chmod +x dist/${{ matrix.artifact_name }}
-          arch -x86_64 dist/${{ matrix.artifact_name }} --help
+          chmod +x dist/mem/mem
+          arch -x86_64 dist/mem/mem --help
 
       - name: Test binary (Windows)
         if: matrix.platform == 'windows'
         run: |
-          dist\${{ matrix.artifact_name }} --help
+          dist\mem\mem.exe --help
 
-      - name: Rename artifact
-        if: matrix.platform != 'windows'
-        run: |
-          mv dist/${{ matrix.artifact_name }} dist/${{ matrix.asset_name }}
-
-      - name: Rename artifact (Windows)
-        if: matrix.platform == 'windows'
-        run: |
-          Move-Item dist\${{ matrix.artifact_name }} dist\${{ matrix.asset_name }}
-
-      - name: Upload artifact
+      - name: Upload artifact (directory)
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.asset_name }}
-          path: dist/${{ matrix.asset_name }}
+          path: dist/mem/
           retention-days: 7
 
       - name: Create tarball (Linux/macOS)
         if: matrix.platform != 'windows' && startsWith(github.ref, 'refs/tags/')
         run: |
           cd dist
-          tar -czf ${{ matrix.asset_name }}.tar.gz ${{ matrix.asset_name }}
+          # Package as mem/ directory inside tarball
+          tar -czf ${{ matrix.asset_name }}.tar.gz mem
 
       - name: Create zip (Windows)
         if: matrix.platform == 'windows' && startsWith(github.ref, 'refs/tags/')
         run: |
           cd dist
-          Compress-Archive -Path ${{ matrix.asset_name }} -DestinationPath ${{ matrix.asset_name }}.zip
+          Compress-Archive -Path mem -DestinationPath ${{ matrix.asset_name }}.zip
 
       - name: Upload Release Asset (Linux/macOS)
         if: matrix.platform != 'windows' && startsWith(github.ref, 'refs/tags/')
@@ -184,17 +219,24 @@ jobs:
             - [mem-macos-arm64.tar.gz](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/mem-macos-arm64.tar.gz) (Apple Silicon)
 
             ### Windows
-            - [mem-windows-x86_64.exe.zip](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/mem-windows-x86_64.exe.zip)
+            - [mem-windows-x86_64.zip](https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/mem-windows-x86_64.zip)
 
-            ## Installation
+            ## Quick Install (Recommended)
+
+            ```bash
+            curl -fsSL https://raw.githubusercontent.com/memovai/memov/main/install.sh | bash
+            ```
+
+            ## Manual Installation
 
             ### Linux / macOS
             ```bash
             # Download and extract
             tar -xzf mem-<platform>-<arch>.tar.gz
 
-            # Move to PATH
-            sudo mv mem-<platform>-<arch> /usr/local/bin/mem
+            # Install to /usr/local/lib and create symlink
+            sudo cp -r mem /usr/local/lib/
+            sudo ln -sf /usr/local/lib/mem/mem /usr/local/bin/mem
 
             # Verify installation
             mem --help
@@ -203,13 +245,19 @@ jobs:
             ### Windows
             ```powershell
             # Extract the zip file
-            # Move mem-windows-x86_64.exe to a directory in your PATH
-            # Or add the directory to your PATH environment variable
+            # Add the extracted 'mem' folder to your PATH
+            # Or move mem\mem.exe to a directory in your PATH
 
             # Verify installation
             mem --help
             ```
 
-            See [BUILD_AND_INSTALL.md](https://github.com/${{ github.repository }}/blob/main/docs/BUILD_AND_INSTALL.md) for detailed instructions.
+            ## Performance
+
+            This release uses **onedir** mode for fast startup:
+            - First run: ~10-20s (OS security scan)
+            - Subsequent runs: **~0.2s**
+
+            See [docs/BUILD_AND_INSTALL.md](https://github.com/${{ github.repository }}/blob/main/docs/BUILD_AND_INSTALL.md) for detailed instructions.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
