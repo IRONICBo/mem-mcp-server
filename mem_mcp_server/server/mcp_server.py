@@ -370,6 +370,244 @@ class MemMCPTools:
             LOGGER.error(error_msg, exc_info=True)
             return error_msg
 
+    @staticmethod
+    @mcp.tool()
+    def mem_history(limit: int = 20, commit_hash: str = "") -> str:
+        """View memov history - list of snapshots with prompts, responses, and file changes.
+
+        **Purpose:**
+        Browse the history of AI-assisted code changes recorded by memov.
+        Each entry shows what was asked, what was done, and which files were changed.
+
+        **When to use:**
+        - To understand what changes were made previously
+        - To find a specific commit to jump back to
+        - To review the sequence of AI interactions
+        - Before using `mem jump` to restore a previous state
+
+        Args:
+            limit: Maximum number of commits to return (default: 20, max: 50)
+            commit_hash: If provided, show detailed info for this specific commit only
+
+        Returns:
+            Formatted history with commit info, prompts, responses, and files
+        """
+        try:
+            LOGGER.info(f"mem_history called with limit={limit}, commit_hash={commit_hash}")
+
+            if MemMCPTools._project_path is None:
+                raise ValueError("Project path is not set.")
+
+            if not os.path.exists(MemMCPTools._project_path):
+                raise ValueError(f"Project path '{MemMCPTools._project_path}' does not exist.")
+
+            memov_manager = MemovManager(project_path=MemMCPTools._project_path)
+
+            if (check_status := memov_manager.check()) is not MemStatus.SUCCESS:
+                return f"[ERROR] Memov not initialized: {check_status}. Run 'mem init' first."
+
+            # Limit to reasonable number
+            limit = min(max(1, limit), 50)
+
+            # Get history data
+            history = memov_manager.get_history(limit=limit)
+
+            if not history:
+                return "[INFO] No history found. Start by tracking files with 'mem track'."
+
+            # If specific commit requested, show detailed view
+            if commit_hash and commit_hash.strip():
+                target = commit_hash.strip().lower()
+                for entry in history:
+                    if entry["commit_hash"].startswith(target) or entry["short_hash"] == target:
+                        return MemMCPTools._format_commit_detail(entry)
+                return f"[ERROR] Commit '{commit_hash}' not found in history."
+
+            # Format history list
+            return MemMCPTools._format_history_list(history)
+
+        except Exception as e:
+            error_msg = f"[ERROR] Error in mem_history: {str(e)}"
+            LOGGER.error(error_msg, exc_info=True)
+            return error_msg
+
+    @staticmethod
+    def _format_history_list(history: list[dict]) -> str:
+        """Format history list for display."""
+        lines = []
+        lines.append("=" * 80)
+        lines.append("MEMOV HISTORY")
+        lines.append("=" * 80)
+        lines.append("")
+
+        for entry in history:
+            marker = "* " if entry["is_head"] else "  "
+            branch_str = f"[{entry['branch']}]" if entry["branch"] else ""
+
+            lines.append(f"{marker}{entry['short_hash']} {branch_str}")
+            lines.append(f"   Operation: {entry['operation']}")
+
+            if entry["prompt"]:
+                prompt_preview = (
+                    entry["prompt"][:80] + "..." if len(entry["prompt"]) > 80 else entry["prompt"]
+                )
+                lines.append(f"   Prompt: {prompt_preview}")
+
+            if entry["files"]:
+                files_preview = ", ".join(entry["files"][:3])
+                if len(entry["files"]) > 3:
+                    files_preview += f" (+{len(entry['files']) - 3} more)"
+                lines.append(f"   Files: {files_preview}")
+
+            if entry["timestamp"]:
+                lines.append(f"   Time: {entry['timestamp']}")
+
+            lines.append("")
+
+        lines.append("=" * 80)
+        lines.append(f"Showing {len(history)} commits. Use commit_hash parameter for details.")
+        return "\n".join(lines)
+
+    @staticmethod
+    def _format_commit_detail(entry: dict) -> str:
+        """Format detailed commit info."""
+        lines = []
+        lines.append("=" * 80)
+        lines.append(f"COMMIT DETAIL: {entry['commit_hash']}")
+        lines.append("=" * 80)
+        lines.append("")
+
+        lines.append(f"Hash: {entry['commit_hash']}")
+        lines.append(f"Operation: {entry['operation']}")
+        if entry["branch"]:
+            lines.append(f"Branch: {entry['branch']}")
+        lines.append(f"Is HEAD: {'Yes' if entry['is_head'] else 'No'}")
+        if entry["timestamp"]:
+            lines.append(f"Timestamp: {entry['timestamp']}")
+        if entry["author"]:
+            lines.append(f"Author: {entry['author']}")
+        lines.append("")
+
+        if entry["prompt"]:
+            lines.append("PROMPT:")
+            lines.append(entry["prompt"])
+            lines.append("")
+
+        if entry["response"]:
+            lines.append("RESPONSE:")
+            lines.append(entry["response"])
+            lines.append("")
+
+        if entry["agent_plan"]:
+            lines.append("AGENT PLAN:")
+            lines.append(entry["agent_plan"])
+            lines.append("")
+
+        if entry["files"]:
+            lines.append(f"FILES ({len(entry['files'])}):")
+            for f in entry["files"]:
+                lines.append(f"  - {f}")
+            lines.append("")
+
+        lines.append("=" * 80)
+        return "\n".join(lines)
+
+    @staticmethod
+    @mcp.tool()
+    def mem_jump(commit_hash: str) -> str:
+        """Jump to a specific snapshot, restoring all tracked files and creating a new branch.
+
+        **Purpose:**
+        Time-travel to a previous state by restoring all tracked files to exactly
+        how they were at a specific commit. This is useful for:
+        - Undoing unwanted changes
+        - Reviewing or testing a previous version
+        - Starting fresh from a known good state
+
+        **What happens:**
+        - This will OVERWRITE current file contents with the snapshot version
+        - A new branch (e.g., "jump/1") is automatically created at this commit
+        - You can immediately start making changes and snapping on this branch
+        - Files that existed in the snapshot but were deleted will be restored
+        - Files that exist now but didn't exist in the snapshot will be removed
+
+        **Workflow:**
+        1. Use `mem_history()` to find the commit hash you want to jump to
+        2. Use `mem_jump(commit_hash)` to restore files and create a new branch
+        3. Continue working - you're now on a new branch ready for snaps
+
+        Args:
+            commit_hash: The commit hash to jump to (full or short form, e.g., "abc123")
+
+        Returns:
+            Success or error message with details about the jump
+        """
+        try:
+            LOGGER.info(f"mem_jump called with commit_hash={commit_hash}")
+
+            if not commit_hash or not commit_hash.strip():
+                return (
+                    "[ERROR] commit_hash is required. Use mem_history() to find available commits."
+                )
+
+            if MemMCPTools._project_path is None:
+                raise ValueError("Project path is not set.")
+
+            if not os.path.exists(MemMCPTools._project_path):
+                raise ValueError(f"Project path '{MemMCPTools._project_path}' does not exist.")
+
+            memov_manager = MemovManager(project_path=MemMCPTools._project_path)
+
+            if (check_status := memov_manager.check()) is not MemStatus.SUCCESS:
+                return f"[ERROR] Memov not initialized: {check_status}. Run 'mem init' first."
+
+            # Get commit info before jumping for better feedback
+            history = memov_manager.get_history(limit=50)
+            target_entry = None
+            target_hash = commit_hash.strip().lower()
+            for entry in history:
+                if (
+                    entry["commit_hash"].startswith(target_hash)
+                    or entry["short_hash"] == target_hash
+                ):
+                    target_entry = entry
+                    break
+
+            if not target_entry:
+                return f"[ERROR] Commit '{commit_hash}' not found. Use mem_history() to see available commits."
+
+            # Perform the jump (now returns tuple)
+            jump_status, new_branch = memov_manager.jump(commit_hash.strip())
+
+            if jump_status is not MemStatus.SUCCESS:
+                return f"[ERROR] Failed to jump to commit '{commit_hash}': {jump_status}"
+
+            # Build success message
+            lines = []
+            lines.append(f"[SUCCESS] Jumped to commit {target_entry['short_hash']}")
+            lines.append(f"Created branch: {new_branch}")
+            lines.append("")
+            lines.append(f"Commit: {target_entry['commit_hash']}")
+            lines.append(f"Operation: {target_entry['operation']}")
+            if target_entry["prompt"]:
+                prompt_preview = (
+                    target_entry["prompt"][:100] + "..."
+                    if len(target_entry["prompt"]) > 100
+                    else target_entry["prompt"]
+                )
+                lines.append(f"Prompt: {prompt_preview}")
+            if target_entry["files"]:
+                lines.append(f"Files restored: {len(target_entry['files'])}")
+            lines.append("")
+            lines.append(f"You are now on branch '{new_branch}' - ready to snap!")
+
+            return "\n".join(lines)
+
+        except Exception as e:
+            error_msg = f"[ERROR] Error in mem_jump: {str(e)}"
+            LOGGER.error(error_msg, exc_info=True)
+            return error_msg
+
 
 # RAG-dependent MCP tools (only registered when [rag] extras are installed)
 if CHROMADB_AVAILABLE:

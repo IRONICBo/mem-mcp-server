@@ -720,40 +720,203 @@ class MemovManager:
         except Exception as e:
             LOGGER.error(f"Error showing history in memov repo: {e}")
 
-    def jump(self, commit_hash: str) -> None:
-        """Jump to a specific snapshot in the memov repo (only move HEAD, do not change branches)."""
+    def get_history(self, limit: int = 20) -> list[dict]:
+        """Get the history of all branches in the memov bare repo as structured data.
+
+        Args:
+            limit: Maximum number of commits to return (default: 20)
+
+        Returns:
+            List of commit dictionaries with keys:
+                - commit_hash: Full commit hash
+                - short_hash: 7-char short hash
+                - operation: Operation type (track, snap, rename, etc.)
+                - branch: Branch name(s) if commit is a branch tip
+                - is_head: Whether this commit is the current HEAD
+                - prompt: User prompt
+                - response: AI response
+                - agent_plan: Agent plan (if available)
+                - files: List of files in the commit
+                - timestamp: Commit timestamp (ISO format)
+                - author: Commit author
+        """
+        result = []
         try:
+            # Load branches from the memov repo
+            branches = self._load_branches()
+            if branches is None:
+                LOGGER.warning("No branches found in the memov repo.")
+                return []
+
+            # Get the head commit
+            head_commit = GitManager.get_commit_id_by_ref(
+                self.bare_repo_path, "refs/memov/HEAD", verbose=False
+            )
+            commit_to_branch = defaultdict(list)
+            for name, commit_hash in branches["branches"].items():
+                commit_to_branch[commit_hash].append(name)
+
+            # Get commit history for each branch
+            seen = set()
+            all_commits = []
+            for commit_hash in branches["branches"].values():
+                commit_history = GitManager.get_commit_history(self.bare_repo_path, commit_hash)
+                for hash_id in commit_history:
+                    if hash_id not in seen:
+                        seen.add(hash_id)
+                        all_commits.append(hash_id)
+
+            # Process commits (most recent first, limited)
+            all_commits = all_commits[-limit:] if len(all_commits) > limit else all_commits
+
+            for hash_id in all_commits:
+                # Get the commit message
+                message = GitManager.get_commit_message(self.bare_repo_path, hash_id)
+                operation_type = self._extract_operation_type(message)
+
+                # Parse prompt, response, agent_plan from commit message
+                prompt = response = agent_plan = ""
+                for line in message.splitlines():
+                    if line.startswith("Prompt:"):
+                        prompt = line[len("Prompt:") :].strip()
+                    elif line.startswith("Response:"):
+                        response = line[len("Response:") :].strip()
+                    elif line.startswith("Agent Plan:"):
+                        agent_plan = line[len("Agent Plan:") :].strip()
+
+                # Check if there's a git note for this commit (priority over commit message)
+                note_content = GitManager.get_commit_note(self.bare_repo_path, hash_id)
+                if note_content:
+                    for line in note_content.splitlines():
+                        if line.startswith("Prompt:"):
+                            prompt = line[len("Prompt:") :].strip()
+                        elif line.startswith("Response:"):
+                            response = line[len("Response:") :].strip()
+                        elif line.startswith("Agent Plan:"):
+                            agent_plan = line[len("Agent Plan:") :].strip()
+
+                # Get files in this commit
+                file_rel_paths, _ = GitManager.get_files_by_commit(self.bare_repo_path, hash_id)
+
+                # Get commit details (timestamp, author) using git log
+                commit_info = self._get_commit_info(hash_id)
+
+                # Build result entry
+                branch_names = commit_to_branch.get(hash_id, [])
+                result.append(
+                    {
+                        "commit_hash": hash_id,
+                        "short_hash": hash_id[:7],
+                        "operation": operation_type,
+                        "branch": ",".join(branch_names) if branch_names else None,
+                        "is_head": hash_id == head_commit,
+                        "prompt": prompt if prompt and prompt != "None" else None,
+                        "response": response if response and response != "None" else None,
+                        "agent_plan": agent_plan if agent_plan and agent_plan != "None" else None,
+                        "files": file_rel_paths,
+                        "timestamp": commit_info.get("timestamp"),
+                        "author": commit_info.get("author"),
+                    }
+                )
+
+        except Exception as e:
+            LOGGER.error(f"Error getting history from memov repo: {e}")
+
+        return result
+
+    def _get_commit_info(self, commit_hash: str) -> dict:
+        """Get commit info (timestamp, author) for a specific commit."""
+        from memov.core.git import subprocess_call
+
+        command = [
+            "git",
+            f"--git-dir={self.bare_repo_path}",
+            "log",
+            "-1",
+            "--format=%aI|%an",
+            commit_hash,
+        ]
+        success, output = subprocess_call(command=command)
+
+        if success and output.stdout:
+            parts = output.stdout.strip().split("|")
+            if len(parts) == 2:
+                return {"timestamp": parts[0], "author": parts[1]}
+
+        return {"timestamp": None, "author": None}
+
+    def jump(self, commit_hash: str) -> tuple[MemStatus, str]:
+        """Jump to a specific snapshot and auto-create a new branch.
+
+        Args:
+            commit_hash: The commit hash to jump to (full or short form)
+
+        Returns:
+            Tuple of (MemStatus, branch_name) - branch_name is the auto-created branch
+        """
+        try:
+            # Validate commit hash exists
+            full_hash = GitManager.get_commit_id_by_ref(
+                self.bare_repo_path, commit_hash, verbose=False
+            )
+            if not full_hash:
+                LOGGER.error(f"Commit '{commit_hash}' not found.")
+                return MemStatus.UNKNOWN_ERROR, ""
+
             # Get all files that have ever been tracked
             all_tracked_files = set()
             branches = self._load_branches()
+            if branches is None or "branches" not in branches:
+                LOGGER.error("No branches configuration found.")
+                return MemStatus.UNKNOWN_ERROR, ""
+
             for branch_tip in branches["branches"].values():
                 rev_list = GitManager.get_commit_history(self.bare_repo_path, branch_tip)
                 for commit in rev_list:
                     _, file_abs_paths = GitManager.get_files_by_commit(self.bare_repo_path, commit)
                     all_tracked_files.update(file_abs_paths)
 
-            # Remove files that are not in the snapshot
-            snapshot_files, _ = GitManager.get_files_by_commit(self.bare_repo_path, commit_hash)
-            for file_path in all_tracked_files:
-                if file_path not in snapshot_files and os.path.exists(file_path):
-                    os.remove(file_path)
-
-            # Use archive to export the snapshot content to the workspace
-            archive = GitManager.git_archive(self.bare_repo_path, commit_hash)
+            # Verify archive can be created BEFORE deleting files
+            archive = GitManager.git_archive(self.bare_repo_path, full_hash)
             if archive is None:
                 LOGGER.error(f"Failed to create archive for commit {commit_hash}.")
-                return
+                return MemStatus.UNKNOWN_ERROR, ""
 
+            # Now safe to remove files that are not in the snapshot
+            snapshot_files, _ = GitManager.get_files_by_commit(self.bare_repo_path, full_hash)
+            for file_path in all_tracked_files:
+                if file_path not in snapshot_files and os.path.exists(file_path):
+                    try:
+                        os.remove(file_path)
+                    except OSError as e:
+                        LOGGER.warning(f"Failed to delete {file_path}: {e}")
+
+            # Extract the snapshot content to the workspace
             with tarfile.open(fileobj=io.BytesIO(archive), mode="r:") as tar:
                 tar.extractall(self.project_path)
 
-            # Update branch config
-            self._update_branch(commit_hash, reset_current_branch=True)
-            LOGGER.info(
-                f"Jumped to commit {commit_hash} in memov repo (HEAD updated, branches unchanged)."
-            )
+            # Auto-create a new branch at this commit
+            new_branch = self._generate_jump_branch_name(branches)
+            branches["branches"][new_branch] = full_hash
+            branches["current"] = new_branch
+            self._save_branches(branches)
+            GitManager.update_ref(self.bare_repo_path, "refs/memov/HEAD", full_hash)
+
+            LOGGER.info(f"Jumped to commit {full_hash[:7]} and created branch '{new_branch}'.")
+            return MemStatus.SUCCESS, new_branch
         except Exception as e:
-            LOGGER.error(f"Error jumping to commit in memov repo: {e}")
+            LOGGER.error(f"Error jumping to commit in memov repo: {e}", exc_info=True)
+            return MemStatus.UNKNOWN_ERROR, ""
+
+    def _generate_jump_branch_name(self, branches: dict) -> str:
+        """Generate a unique branch name for jump operation."""
+        if not isinstance(branches, dict) or "branches" not in branches:
+            return "jump/1"
+
+        i = 1
+        while f"jump/{i}" in branches["branches"]:
+            i += 1
+        return f"jump/{i}"
 
     def show(self, commit_id: str) -> None:
         """Show details of a specific snapshot in the memov bare repo, similar to git show."""

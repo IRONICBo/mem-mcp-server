@@ -280,24 +280,22 @@ uv run --directory "$MEMOV_ROOT" mem snap --loc "$PROJECT_DIR" -p "Feature snap"
 OUTPUT=$(uv run --directory "$MEMOV_ROOT" mem branch --loc "$PROJECT_DIR" 2>&1)
 echo "$OUTPUT" | grep "\* feature" > /dev/null && print_success "Snapped on feature branch"
 
-print_step "9.5: Jump to commit (detached)"
+print_step "9.5: Jump to commit (auto-creates branch)"
 FIRST_COMMIT=$(uv run --directory "$MEMOV_ROOT" mem history --loc "$PROJECT_DIR" 2>&1 | grep -oE '[a-f0-9]{7}' | tail -1)
 uv run --directory "$MEMOV_ROOT" mem jump "$FIRST_COMMIT" --loc "$PROJECT_DIR"
 OUTPUT=$(uv run --directory "$MEMOV_ROOT" mem branch --loc "$PROJECT_DIR" 2>&1)
-if ! echo "$OUTPUT" | grep "^\*" > /dev/null; then
-    print_success "Detached HEAD (no current branch marked)"
+if echo "$OUTPUT" | grep "\* jump/" > /dev/null; then
+    print_success "Jump created a new branch"
 else
-    print_error "Should be in detached state"
+    print_error "Jump should create a branch starting with 'jump/'"
+    echo "Got: $OUTPUT"
     exit 1
 fi
 
-print_step "9.6: Snap in detached state should fail"
-if uv run --directory "$MEMOV_ROOT" mem snap --loc "$PROJECT_DIR" 2>&1 | grep -i "not on any branch"; then
-    print_success "Snap correctly rejected in detached state"
-else
-    print_error "Snap should fail in detached state"
-    exit 1
-fi
+print_step "9.6: Can snap immediately after jump"
+echo "Jump branch change" >> README.md
+uv run --directory "$MEMOV_ROOT" mem snap --loc "$PROJECT_DIR" -p "Jump snap" -r "After jump"
+print_success "Can snap immediately after jump"
 
 print_step "9.7: Switch to new branch then snap"
 uv run --directory "$MEMOV_ROOT" mem switch experiment --loc "$PROJECT_DIR"
