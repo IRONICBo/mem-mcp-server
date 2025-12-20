@@ -24,13 +24,12 @@ VibeGit: A shadow `.mem` timeline alongside git — every interaction (prompt, p
 - 💬 [Join our Discord](https://discord.gg/un54aD7Hug) and dive into smarter context engineering
 - 🌐 [Visit memov.ai](https://memov.ai) to visualize your coding memory and supercharge existing GitHub repos
 
-
-<div align="center">
+<!-- <div align="center">
 
 [![Add to VS Code](https://img.shields.io/badge/Add%20to%20VS%20Code-007ACC?style=for-the-badge&logo=visual-studio-code&logoColor=white)](https://memov.ai/set-mcp)
 [![Add to Cursor](https://img.shields.io/badge/Add%20to%20CURSOR-000000?style=for-the-badge&logo=visual-studio-code&logoColor=white)](https://memov.ai/set-mcp)
 
-</div>
+</div> -->
 
 ## Features
 
