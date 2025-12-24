@@ -420,7 +420,7 @@ class MemovManager:
                 commit_hash = GitManager.create_commit_from_tree_structure(
                     self.bare_repo_path,
                     tree_structure,
-                    f"Create snapshot\n\nFiles: {', '.join(sorted(tracked_specified))}\nPrompt: {prompt}\nResponse: {response}\nSource: {'User' if by_user else 'AI'}",
+                    f"Create snapshot\n\nFiles: {', '.join(sorted(tracked_specified))}\nPrompt: {prompt}\nResponse: {response}\nAgent Plan: {agent_plan}\nSource: {'User' if by_user else 'AI'}",
                 )
 
                 if not commit_hash:
@@ -464,9 +464,7 @@ class MemovManager:
                     commit_file_paths[rel_path] = abs_path
 
                 commit_msg = "Create snapshot\n\n"
-                commit_msg += (
-                    f"Prompt: {prompt}\nResponse: {response}\nSource: {'User' if by_user else 'AI'}"
-                )
+                commit_msg += f"Prompt: {prompt}\nResponse: {response}\nAgent Plan: {agent_plan}\nSource: {'User' if by_user else 'AI'}"
 
             commit_hash = self._commit(commit_msg, commit_file_paths)
             LOGGER.info("Snapshot created in memov repo.")
@@ -666,9 +664,9 @@ class MemovManager:
 
             # Print the header with new format including Operation column
             logging.info(
-                f"{'Operation'.ljust(10)} {'Branch'.ljust(20)} {'Commit'.ljust(8)} {'Prompt'.ljust(15)} {'Resp'.ljust(15)}"
+                f"{'Operation'.ljust(10)} {'Branch'.ljust(20)} {'Commit'.ljust(8)} {'Prompt'.ljust(15)} {'Resp'.ljust(15)} {'Plan'.ljust(15)}"
             )
-            logging.info("-" * 70)
+            logging.info("-" * 85)
 
             # Get commit history for each branch and print the details
             seen = set()
@@ -684,23 +682,27 @@ class MemovManager:
                     message = GitManager.get_commit_message(self.bare_repo_path, hash_id)
                     operation_type = self._extract_operation_type(message)
 
-                    # Get prompt and response from commit message first
-                    prompt = response = ""
+                    # Get prompt, response, agent_plan from commit message first
+                    prompt = response = agent_plan = ""
                     for line in message.splitlines():
                         if line.startswith("Prompt:"):
                             prompt = line[len("Prompt:") :].strip()
                         elif line.startswith("Response:"):
                             response = line[len("Response:") :].strip()
+                        elif line.startswith("Agent Plan:"):
+                            agent_plan = line[len("Agent Plan:") :].strip()
 
                     # Check if there's a git note for this commit (priority over commit message)
                     note_content = GitManager.get_commit_note(self.bare_repo_path, hash_id)
                     if note_content:
-                        # Parse the note content for updated prompt/response
+                        # Parse the note content for updated prompt/response/agent_plan
                         for line in note_content.splitlines():
                             if line.startswith("Prompt:"):
                                 prompt = line[len("Prompt:") :].strip()
                             elif line.startswith("Response:"):
                                 response = line[len("Response:") :].strip()
+                            elif line.startswith("Agent Plan:"):
+                                agent_plan = line[len("Agent Plan:") :].strip()
 
                     # Get the branch marker and format the output
                     marker = "*" if hash_id == head_commit else " "
@@ -708,14 +710,17 @@ class MemovManager:
                     branch_str = f"[{branch_names}]" if branch_names else ""
                     hash7 = hash_id[:7]
 
-                    # Format prompt and response, handle None values
+                    # Format prompt, response, agent_plan, handle None values
                     prompt_display = short_msg(prompt) if prompt and prompt != "None" else "None"
                     response_display = (
                         short_msg(response) if response and response != "None" else "None"
                     )
+                    plan_display = (
+                        short_msg(agent_plan) if agent_plan and agent_plan != "None" else "None"
+                    )
 
                     logging.info(
-                        f"{operation_type.ljust(10)} {marker} {branch_str.ljust(18)} {hash7.ljust(8)} {prompt_display.ljust(15)} {response_display.ljust(15)}"
+                        f"{operation_type.ljust(10)} {marker} {branch_str.ljust(18)} {hash7.ljust(8)} {prompt_display.ljust(15)} {response_display.ljust(15)} {plan_display.ljust(15)}"
                     )
         except Exception as e:
             LOGGER.error(f"Error showing history in memov repo: {e}")
