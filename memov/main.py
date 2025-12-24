@@ -487,6 +487,58 @@ def search(
         sys.exit(1)
 
 
+@app.command()
+def web(
+    loc: LocOption = ".",
+    port: Annotated[
+        int,
+        typer.Option(
+            "--port",
+            "-p",
+            help="Port to run the web server on",
+        ),
+    ] = 38888,
+) -> None:
+    """Start the MemoV web UI for visualizing commit history.
+
+    Opens a local web server at http://localhost:38888 (default port)
+    that displays an interactive timeline of all commits with their
+    prompts, plans, and file changes.
+
+    Example:
+        mem web
+        mem web --port 8080
+    """
+    try:
+        from memov.web.server import FASTAPI_AVAILABLE, start_server
+
+        if not FASTAPI_AVAILABLE:
+            console.print(
+                "[red]Error: FastAPI not installed[/red]\n\n"
+                "[yellow]The web UI requires FastAPI and uvicorn.[/yellow]\n"
+                "Install with:\n"
+                "  [cyan]pip install memov[web][/cyan]\n"
+                "or\n"
+                "  [cyan]uv pip install fastapi uvicorn[/cyan]"
+            )
+            sys.exit(1)
+
+        # Resolve project path
+        project_path = os.path.abspath(loc)
+
+        # Start the server
+        start_server(project_path=project_path, port=port)
+
+    except ImportError as e:
+        console.print(f"[red]Import error: {e}[/red]")
+        console.print("[yellow]Install with:[/yellow] [cyan]pip install memov[web][/cyan]")
+        sys.exit(1)
+    except Exception as e:
+        console.print(f"[red]Error starting web server: {e}[/red]")
+        logging.error(f"Web server error: {e}", exc_info=True)
+        sys.exit(1)
+
+
 def main() -> None:
     """Main entry point for the memov command line interface."""
     try:

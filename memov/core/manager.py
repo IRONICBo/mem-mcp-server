@@ -933,6 +933,74 @@ class MemovManager:
         except Exception as e:
             LOGGER.error(f"Error showing snapshot {commit_id} in bare repo: {e}")
 
+    def get_diff(self, commit_hash: str) -> dict[str, str]:
+        """Get diff content for a specific commit.
+
+        Args:
+            commit_hash: The commit hash to get diff for.
+
+        Returns:
+            Dictionary mapping file paths to their diff content.
+        """
+        try:
+            from memov.core.git import subprocess_call
+
+            # Resolve the full commit hash
+            full_hash = GitManager.get_commit_id_by_ref(
+                self.bare_repo_path, commit_hash, verbose=False
+            )
+            if not full_hash:
+                LOGGER.error(f"Commit '{commit_hash}' not found.")
+                return {}
+
+            # Get the parent commit (if exists)
+            command = [
+                "git",
+                f"--git-dir={self.bare_repo_path}",
+                "rev-parse",
+                f"{full_hash}^",
+            ]
+            success, output = subprocess_call(command=command)
+
+            diffs = {}
+
+            if success and output.stdout.strip():
+                # Has parent - get diff between parent and this commit
+                parent_hash = output.stdout.strip()
+                diff_command = [
+                    "git",
+                    f"--git-dir={self.bare_repo_path}",
+                    "diff",
+                    parent_hash,
+                    full_hash,
+                ]
+                success, diff_output = subprocess_call(command=diff_command)
+                if success:
+                    diffs["_all"] = diff_output.stdout
+            else:
+                # No parent (first commit) - show all files as added
+                file_rel_paths, _ = GitManager.get_files_by_commit(self.bare_repo_path, full_hash)
+                for rel_path in file_rel_paths:
+                    # Get file content from the commit
+                    show_command = [
+                        "git",
+                        f"--git-dir={self.bare_repo_path}",
+                        "show",
+                        f"{full_hash}:{rel_path}",
+                    ]
+                    success, content_output = subprocess_call(command=show_command)
+                    if success:
+                        # Format as diff-like output
+                        lines = content_output.stdout.splitlines()
+                        diff_lines = [f"+{line}" for line in lines]
+                        diffs[rel_path] = "\n".join(diff_lines)
+
+            return diffs
+
+        except Exception as e:
+            LOGGER.error(f"Error getting diff for commit {commit_hash}: {e}")
+            return {}
+
     def status(self) -> tuple[MemStatus, dict[str, list[Path]]]:
         """Show status of working directory compared to HEAD snapshot, and display current HEAD commit and branch."""
         try:

@@ -1,0 +1,184 @@
+"""MemoV Web UI Server - FastAPI backend for visualizing commit history."""
+
+import logging
+import os
+from pathlib import Path
+from typing import Optional
+
+try:
+    import uvicorn
+    from fastapi import FastAPI, HTTPException
+    from fastapi.responses import HTMLResponse, JSONResponse
+    from fastapi.staticfiles import StaticFiles
+
+    FASTAPI_AVAILABLE = True
+except ImportError:
+    FASTAPI_AVAILABLE = False
+
+from memov.core.manager import MemovManager, MemStatus
+
+LOGGER = logging.getLogger(__name__)
+
+# Global project path (set when server starts)
+_project_path: Optional[str] = None
+
+
+def create_app(project_path: str) -> "FastAPI":
+    """Create FastAPI application with routes."""
+    global _project_path
+    _project_path = project_path
+
+    if not FASTAPI_AVAILABLE:
+        raise ImportError("FastAPI not installed. Install with: pip install memov[web]")
+
+    app = FastAPI(title="MemoV Web UI", version="1.0.0")
+
+    # API Routes
+    @app.get("/api/branches")
+    def get_branches():
+        """Get all branches and current branch."""
+        manager = MemovManager(project_path=_project_path)
+        if manager.check() is not MemStatus.SUCCESS:
+            raise HTTPException(status_code=400, detail="Memov not initialized")
+
+        branches = manager._load_branches()
+        if branches is None:
+            return {"current": None, "branches": {}}
+        return branches
+
+    @app.get("/api/graph")
+    def get_graph():
+        """Get commit graph data for visualization."""
+        manager = MemovManager(project_path=_project_path)
+        if manager.check() is not MemStatus.SUCCESS:
+            raise HTTPException(status_code=400, detail="Memov not initialized")
+
+        history = manager.get_history(limit=100)
+        branches = manager._load_branches()
+
+        # Build graph structure
+        nodes = []
+        edges = []
+        seen_commits = set()
+
+        for entry in history:
+            commit_hash = entry["commit_hash"]
+            if commit_hash in seen_commits:
+                continue
+            seen_commits.add(commit_hash)
+
+            nodes.append(
+                {
+                    "id": commit_hash,
+                    "short_hash": entry["short_hash"],
+                    "operation": entry["operation"],
+                    "branch": entry["branch"],
+                    "is_head": entry["is_head"],
+                    "prompt": entry["prompt"],
+                    "response": entry["response"],
+                    "agent_plan": entry["agent_plan"],
+                    "files": entry["files"],
+                    "timestamp": entry["timestamp"],
+                    "author": entry["author"],
+                }
+            )
+
+        # Build edges (parent relationships) using git rev-list
+        from memov.core.git import GitManager
+
+        if branches:
+            for branch_name, tip_hash in branches.get("branches", {}).items():
+                commit_list = GitManager.get_commit_history(manager.bare_repo_path, tip_hash)
+                for i in range(len(commit_list) - 1):
+                    edges.append(
+                        {
+                            "from": commit_list[i],
+                            "to": commit_list[i + 1],
+                        }
+                    )
+
+        return {
+            "nodes": nodes,
+            "edges": edges,
+            "current_branch": branches.get("current") if branches else None,
+        }
+
+    @app.get("/api/commit/{commit_hash}")
+    def get_commit(commit_hash: str):
+        """Get detailed info for a specific commit."""
+        manager = MemovManager(project_path=_project_path)
+        if manager.check() is not MemStatus.SUCCESS:
+            raise HTTPException(status_code=400, detail="Memov not initialized")
+
+        history = manager.get_history(limit=100)
+        for entry in history:
+            if entry["commit_hash"].startswith(commit_hash) or entry["short_hash"] == commit_hash:
+                return entry
+
+        raise HTTPException(status_code=404, detail=f"Commit {commit_hash} not found")
+
+    @app.get("/api/diff/{commit_hash}")
+    def get_diff(commit_hash: str):
+        """Get diff for a commit."""
+        manager = MemovManager(project_path=_project_path)
+        if manager.check() is not MemStatus.SUCCESS:
+            raise HTTPException(status_code=400, detail="Memov not initialized")
+
+        diff_content = manager.get_diff(commit_hash)
+        return {"commit_hash": commit_hash, "diff": diff_content}
+
+    @app.post("/api/jump/{commit_hash}")
+    def jump_to_commit(commit_hash: str):
+        """Jump to a specific commit."""
+        manager = MemovManager(project_path=_project_path)
+        if manager.check() is not MemStatus.SUCCESS:
+            raise HTTPException(status_code=400, detail="Memov not initialized")
+
+        status, new_branch = manager.jump(commit_hash)
+        if status is not MemStatus.SUCCESS:
+            raise HTTPException(status_code=400, detail=f"Jump failed: {status}")
+
+        return {"status": "success", "new_branch": new_branch}
+
+    # Serve static files (index.html)
+    static_dir = Path(__file__).parent / "static"
+    if static_dir.exists():
+
+        @app.get("/")
+        def serve_index():
+            """Serve the main HTML page."""
+            index_path = static_dir / "index.html"
+            if index_path.exists():
+                return HTMLResponse(content=index_path.read_text(), status_code=200)
+            raise HTTPException(status_code=404, detail="index.html not found")
+
+    return app
+
+
+def start_server(project_path: str, port: int = 38888, host: str = "127.0.0.1"):
+    """Start the MemoV web server."""
+    if not FASTAPI_AVAILABLE:
+        print("Error: FastAPI not installed.")
+        print("Install with: pip install memov[web]")
+        print("Or: uv pip install fastapi uvicorn")
+        return
+
+    # Validate project path
+    if not os.path.exists(project_path):
+        print(f"Error: Project path '{project_path}' does not exist.")
+        return
+
+    manager = MemovManager(project_path=project_path)
+    if manager.check() is not MemStatus.SUCCESS:
+        print(f"Error: Memov not initialized in '{project_path}'.")
+        print("Run 'mem init' first.")
+        return
+
+    app = create_app(project_path)
+
+    print(f"Starting MemoV Web UI...")
+    print(f"Project: {project_path}")
+    print(f"URL: http://{host}:{port}")
+    print("Press Ctrl+C to stop.")
+
+    uvicorn.run(app, host=host, port=port, log_level="warning")

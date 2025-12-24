@@ -16,6 +16,11 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# Web UI mode: Visual commit history browser
+web = [
+    "fastapi>=0.100.0",
+]
+
 # RAG mode: Semantic search with VectorDB (sync, search commands)
 rag = [
     "chromadb>=0.5.0",
@@ -43,6 +48,7 @@ packages = [
     "memov",
     "memov.core",
     "memov.utils",
+    "memov.web",
     "mem_mcp_server",
     "mem_mcp_server.cli",
     "mem_mcp_server.server",
@@ -51,6 +57,7 @@ packages = [
 
 [tool.setuptools.package-data]
 "*" = ["**/*.py"]
+"memov.web" = ["static/*"]
 
 [tool.black]
 line-length = 100

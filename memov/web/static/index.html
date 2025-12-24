@@ -1,0 +1,818 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MemoV Timeline</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: #fafafa;
+            color: #333;
+            min-height: 100vh;
+        }
+
+        /* Header */
+        .header {
+            background: #fff;
+            padding: 16px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #e5e5e5;
+        }
+
+        .header h1 {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .header-info {
+            color: #888;
+            font-size: 13px;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .mode-toggle {
+            padding: 6px 12px;
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            color: #555;
+        }
+
+        .mode-toggle:hover {
+            background: #eee;
+        }
+
+        .mode-toggle.active {
+            background: #333;
+            color: white;
+            border-color: #333;
+        }
+
+        /* Main container */
+        .container {
+            display: flex;
+            height: calc(100vh - 56px);
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 180px;
+            background: #fff;
+            border-right: 1px solid #e5e5e5;
+            padding: 16px;
+            overflow-y: auto;
+        }
+
+        .sidebar h2 {
+            font-size: 11px;
+            color: #999;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .branch-item {
+            padding: 6px 10px;
+            margin-bottom: 2px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            color: #555;
+        }
+
+        .branch-item:hover {
+            background: #f0f0f0;
+        }
+
+        .branch-item.current {
+            background: #333;
+            color: white;
+        }
+
+        .branch-item .count {
+            float: right;
+            color: #aaa;
+            font-size: 11px;
+        }
+
+        .branch-item.current .count {
+            color: #ccc;
+        }
+
+        /* Timeline */
+        .timeline {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px;
+        }
+
+        .timeline-container {
+            position: relative;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        /* Node */
+        .node {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 16px;
+            position: relative;
+        }
+
+        .node-line {
+            position: absolute;
+            left: 9px;
+            top: 20px;
+            bottom: -16px;
+            width: 2px;
+            background: #ddd;
+        }
+
+        .node:last-child .node-line {
+            display: none;
+        }
+
+        .node-dot {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #fff;
+            border: 2px solid #999;
+            flex-shrink: 0;
+            z-index: 1;
+            cursor: pointer;
+            transition: transform 0.15s;
+        }
+
+        .node-dot:hover {
+            transform: scale(1.15);
+            border-color: #333;
+        }
+
+        .node-dot.head {
+            background: #333;
+            border-color: #333;
+        }
+
+        /* Node card */
+        .node-card {
+            margin-left: 12px;
+            background: #fff;
+            border: 1px solid #e5e5e5;
+            border-radius: 6px;
+            padding: 12px 16px;
+            flex: 1;
+            max-width: 700px;
+            cursor: pointer;
+            transition: border-color 0.15s, box-shadow 0.15s;
+        }
+
+        .node-card:hover {
+            border-color: #ccc;
+        }
+
+        .node-card.expanded {
+            border-color: #333;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        }
+
+        .node-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 6px;
+        }
+
+        .node-hash {
+            font-family: 'SF Mono', Consolas, monospace;
+            background: #f5f5f5;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 12px;
+            color: #666;
+        }
+
+        .node-operation {
+            font-size: 11px;
+            color: #999;
+            text-transform: uppercase;
+        }
+
+        .node-branch {
+            font-size: 11px;
+            background: #e8f5e9;
+            color: #2e7d32;
+            padding: 2px 8px;
+            border-radius: 10px;
+        }
+
+        .node-time {
+            font-size: 11px;
+            color: #aaa;
+            margin-left: auto;
+        }
+
+        .node-prompt {
+            color: #444;
+            font-size: 13px;
+            margin-bottom: 6px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .node-files {
+            display: flex;
+            gap: 6px;
+            flex-wrap: wrap;
+        }
+
+        .node-file {
+            font-size: 11px;
+            color: #777;
+            background: #f5f5f5;
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+
+        /* Expanded details */
+        .node-details {
+            display: none;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #eee;
+        }
+
+        .node-card.expanded .node-details {
+            display: block;
+        }
+
+        .detail-section {
+            margin-bottom: 12px;
+        }
+
+        .detail-section h4 {
+            color: #666;
+            font-size: 11px;
+            text-transform: uppercase;
+            margin-bottom: 6px;
+            letter-spacing: 0.3px;
+        }
+
+        .detail-section p {
+            color: #444;
+            font-size: 13px;
+            line-height: 1.5;
+            white-space: pre-wrap;
+        }
+
+        .detail-files {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .detail-file {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 8px;
+            background: #f8f8f8;
+            border-radius: 4px;
+        }
+
+        .detail-file .icon {
+            color: #4caf50;
+            font-weight: bold;
+        }
+
+        .detail-file .name {
+            flex: 1;
+            font-family: 'SF Mono', Consolas, monospace;
+            font-size: 12px;
+            color: #555;
+        }
+
+        .btn {
+            padding: 6px 12px;
+            background: #333;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            margin-top: 8px;
+        }
+
+        .btn:hover {
+            background: #444;
+        }
+
+        .btn-secondary {
+            background: #f5f5f5;
+            color: #333;
+            border: 1px solid #ddd;
+        }
+
+        .btn-secondary:hover {
+            background: #eee;
+        }
+
+        /* Diff modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.4);
+            z-index: 100;
+            padding: 40px;
+            overflow-y: auto;
+        }
+
+        .modal.show {
+            display: block;
+        }
+
+        .modal-content {
+            max-width: 800px;
+            margin: 0 auto;
+            background: #fff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            background: #fafafa;
+            border-bottom: 1px solid #eee;
+        }
+
+        .modal-header h3 {
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: #999;
+            font-size: 20px;
+            cursor: pointer;
+        }
+
+        .modal-close:hover {
+            color: #333;
+        }
+
+        .diff-content {
+            padding: 16px;
+            font-family: 'SF Mono', Consolas, monospace;
+            font-size: 12px;
+            line-height: 1.5;
+            overflow-x: auto;
+            white-space: pre;
+            background: #fafafa;
+        }
+
+        .diff-add {
+            color: #2e7d32;
+            background: #e8f5e9;
+        }
+
+        .diff-del {
+            color: #c62828;
+            background: #ffebee;
+        }
+
+        .diff-header {
+            color: #1565c0;
+        }
+
+        /* Loading */
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+
+        /* Empty state */
+        .empty {
+            text-align: center;
+            padding: 60px;
+            color: #999;
+        }
+
+        .empty h3 {
+            margin-bottom: 8px;
+            color: #666;
+            font-weight: 500;
+        }
+
+        /* Skeleton Mode */
+        .skeleton-mode .timeline {
+            padding: 16px;
+        }
+
+        .skeleton-mode .node {
+            margin-bottom: 4px;
+        }
+
+        .skeleton-mode .node-card {
+            display: none;
+        }
+
+        .skeleton-mode .node-dot {
+            width: 12px;
+            height: 12px;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .skeleton-mode .node-dot::after {
+            content: attr(data-label);
+            position: absolute;
+            left: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 10px;
+            color: #666;
+            white-space: nowrap;
+            pointer-events: none;
+        }
+
+        .skeleton-mode .node-dot.head::after {
+            font-weight: bold;
+            color: #333;
+        }
+
+        .skeleton-mode .node-line {
+            left: 5px;
+            top: 12px;
+            bottom: -4px;
+        }
+
+        .skeleton-mode .node[style*="opacity: 0.3"] .node-dot {
+            opacity: 0.3;
+        }
+
+        .skeleton-mode .node[style*="opacity: 1"] .node-dot,
+        .skeleton-mode .node:not([style*="opacity"]) .node-dot {
+            opacity: 1;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>MemoV Timeline</h1>
+        <div class="header-actions">
+            <button class="mode-toggle" id="skeleton-toggle" onclick="toggleSkeletonMode()">Skeleton</button>
+            <div class="header-info" id="branch-info">Loading...</div>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="sidebar">
+            <h2>Branches</h2>
+            <div id="branches-list">
+                <div class="loading">Loading...</div>
+            </div>
+        </div>
+
+        <div class="timeline">
+            <div class="timeline-container" id="timeline">
+                <div class="loading">Loading commits...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Diff Modal -->
+    <div class="modal" id="diff-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="diff-title">Diff</h3>
+                <button class="modal-close" onclick="closeDiffModal()">&times;</button>
+            </div>
+            <div class="diff-content" id="diff-content"></div>
+        </div>
+    </div>
+
+    <script>
+        let graphData = null;
+        let branchesData = null;
+        let childToParent = {};
+        let expandedNode = null;
+
+        // Fetch and render data
+        async function init() {
+            try {
+                const [branchesRes, graphRes] = await Promise.all([
+                    fetch('/api/branches'),
+                    fetch('/api/graph')
+                ]);
+
+                const branches = await branchesRes.json();
+                graphData = await graphRes.json();
+                branchesData = branches;
+
+                // Build childToParent mapping from edges
+                childToParent = {};
+                if (graphData.edges) {
+                    graphData.edges.forEach(e => {
+                        childToParent[e.to] = e.from;
+                    });
+                }
+
+                renderBranches(branches);
+                renderTimeline(graphData);
+
+                document.getElementById('branch-info').textContent =
+                    `Current: ${branches.current || 'detached'}`;
+            } catch (error) {
+                console.error('Failed to load data:', error);
+                document.getElementById('timeline').innerHTML =
+                    '<div class="empty"><h3>Error loading data</h3><p>Make sure memov is initialized.</p></div>';
+            }
+        }
+
+        function renderBranches(branches) {
+            const container = document.getElementById('branches-list');
+            if (!branches.branches || Object.keys(branches.branches).length === 0) {
+                container.innerHTML = '<div class="empty">No branches</div>';
+                return;
+            }
+
+            // Count commits per branch using graph traversal
+            const branchCommitCounts = {};
+            for (const [name, tipCommit] of Object.entries(branches.branches)) {
+                let count = 0;
+                let current = tipCommit;
+                while (current) {
+                    count++;
+                    current = childToParent[current];
+                }
+                branchCommitCounts[name] = count;
+            }
+
+            container.innerHTML = Object.entries(branches.branches)
+                .map(([name, hash]) => `
+                    <div class="branch-item ${name === branches.current ? 'current' : ''}"
+                         onclick="filterBranch('${name}')">
+                        ${name}
+                        <span class="count">${branchCommitCounts[name] || 0}</span>
+                    </div>
+                `).join('');
+        }
+
+        function renderTimeline(data) {
+            const container = document.getElementById('timeline');
+
+            if (!data.nodes || data.nodes.length === 0) {
+                container.innerHTML = '<div class="empty"><h3>No commits yet</h3><p>Start tracking files with mem track.</p></div>';
+                return;
+            }
+
+            // Sort nodes by timestamp (most recent first)
+            const sortedNodes = [...data.nodes].sort((a, b) => {
+                if (!a.timestamp) return 1;
+                if (!b.timestamp) return -1;
+                return new Date(b.timestamp) - new Date(a.timestamp);
+            });
+
+            container.innerHTML = sortedNodes.map(node => `
+                <div class="node" data-id="${node.id}">
+                    <div class="node-line"></div>
+                    <div class="node-dot ${node.is_head ? 'head' : ''}" data-label="${node.short_hash}${node.branch ? ' [' + node.branch + ']' : ''}" onclick="toggleNode('${node.id}')"></div>
+                    <div class="node-card" id="card-${node.id}" onclick="toggleNode('${node.id}')">
+                        <div class="node-header">
+                            <span class="node-hash">${node.short_hash}</span>
+                            <span class="node-operation">${node.operation || 'snap'}</span>
+                            ${node.branch ? `<span class="node-branch">${node.branch}</span>` : ''}
+                            <span class="node-time">${formatTime(node.timestamp)}</span>
+                        </div>
+                        <div class="node-prompt">${escapeHtml(node.prompt || 'No prompt')}</div>
+                        <div class="node-files">
+                            ${(node.files || []).slice(0, 3).map(f => `<span class="node-file">${f}</span>`).join('')}
+                            ${(node.files || []).length > 3 ? `<span class="node-file">+${node.files.length - 3} more</span>` : ''}
+                        </div>
+                        <div class="node-details">
+                            ${node.prompt ? `
+                            <div class="detail-section">
+                                <h4>Prompt</h4>
+                                <p>${escapeHtml(node.prompt)}</p>
+                            </div>
+                            ` : ''}
+                            ${node.agent_plan ? `
+                            <div class="detail-section">
+                                <h4>Agent Plan</h4>
+                                <p>${escapeHtml(node.agent_plan)}</p>
+                            </div>
+                            ` : ''}
+                            ${node.response ? `
+                            <div class="detail-section">
+                                <h4>Response</h4>
+                                <p>${escapeHtml(node.response)}</p>
+                            </div>
+                            ` : ''}
+                            <div class="detail-section">
+                                <h4>Files (${(node.files || []).length})</h4>
+                                <div class="detail-files">
+                                    ${(node.files || []).map(f => `
+                                        <div class="detail-file" onclick="event.stopPropagation();">
+                                            <span class="icon">+</span>
+                                            <span class="name">${f}</span>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                            <div style="display: flex; gap: 8px;">
+                                <button class="btn" onclick="event.stopPropagation(); viewDiff('${node.id}')">View Diff</button>
+                                <button class="btn btn-secondary" onclick="event.stopPropagation(); jumpTo('${node.id}')">Jump Here</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function toggleNode(id) {
+            const card = document.getElementById(`card-${id}`);
+            if (expandedNode && expandedNode !== id) {
+                document.getElementById(`card-${expandedNode}`)?.classList.remove('expanded');
+            }
+            card.classList.toggle('expanded');
+            expandedNode = card.classList.contains('expanded') ? id : null;
+        }
+
+        async function viewDiff(commitHash) {
+            try {
+                const res = await fetch(`/api/diff/${commitHash}`);
+                const data = await res.json();
+
+                document.getElementById('diff-title').textContent = `Diff: ${commitHash.substring(0, 7)}`;
+
+                const diffHtml = formatDiff(data.diff);
+                document.getElementById('diff-content').innerHTML = diffHtml;
+                document.getElementById('diff-modal').classList.add('show');
+            } catch (error) {
+                console.error('Failed to load diff:', error);
+                alert('Failed to load diff');
+            }
+        }
+
+        function closeDiffModal() {
+            document.getElementById('diff-modal').classList.remove('show');
+        }
+
+        async function jumpTo(commitHash) {
+            if (!confirm(`Jump to commit ${commitHash.substring(0, 7)}?\n\nThis will restore all files to this state.`)) {
+                return;
+            }
+
+            try {
+                const res = await fetch(`/api/jump/${commitHash}`, { method: 'POST' });
+                const data = await res.json();
+
+                if (data.status === 'success') {
+                    alert(`Jumped to commit!\nNew branch: ${data.new_branch}`);
+                    location.reload();
+                } else {
+                    alert('Jump failed');
+                }
+            } catch (error) {
+                console.error('Failed to jump:', error);
+                alert('Failed to jump to commit');
+            }
+        }
+
+        function filterBranch(branchName) {
+            // Update sidebar highlight
+            const branchItems = document.querySelectorAll('.branch-item');
+            branchItems.forEach(item => {
+                // Get the branch name from the item (text content minus the count)
+                const itemName = item.childNodes[0].textContent.trim();
+                if (itemName === branchName) {
+                    item.classList.add('current');
+                } else {
+                    item.classList.remove('current');
+                }
+            });
+
+            // Update header info
+            document.getElementById('branch-info').textContent = `Current: ${branchName}`;
+
+            // Get the tip commit of this branch
+            const tipCommit = branchesData?.branches?.[branchName];
+            if (!tipCommit) {
+                return;
+            }
+
+            // Traverse from tip to root, collecting all commits in this branch
+            const branchCommits = new Set();
+            let current = tipCommit;
+            let firstCommit = tipCommit;  // Track the earliest commit
+            while (current) {
+                branchCommits.add(current);
+                firstCommit = current;  // Keep updating to get the root
+                current = childToParent[current];
+            }
+
+            // Highlight only commits belonging to this branch
+            const nodes = document.querySelectorAll('.node');
+            nodes.forEach(node => {
+                const nodeId = node.dataset.id;
+                if (branchCommits.has(nodeId)) {
+                    node.style.opacity = '1';
+                } else {
+                    node.style.opacity = '0.3';
+                }
+            });
+
+            // Scroll to the tip commit (most recent in this branch)
+            const targetNode = document.querySelector(`.node[data-id="${tipCommit}"]`);
+            if (targetNode) {
+                targetNode.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }
+
+        function toggleSkeletonMode() {
+            const body = document.body;
+            const btn = document.getElementById('skeleton-toggle');
+            body.classList.toggle('skeleton-mode');
+            btn.classList.toggle('active');
+        }
+
+        function formatTime(timestamp) {
+            if (!timestamp) return '';
+            const date = new Date(timestamp);
+            return date.toLocaleString();
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function formatDiff(diff) {
+            if (!diff) return '<span style="color:#999">No diff available</span>';
+
+            // Handle _all key (combined diff)
+            const content = diff._all || Object.values(diff).join('\n\n');
+
+            return content.split('\n').map(line => {
+                if (line.startsWith('+') && !line.startsWith('+++')) {
+                    return `<span class="diff-add">${escapeHtml(line)}</span>`;
+                } else if (line.startsWith('-') && !line.startsWith('---')) {
+                    return `<span class="diff-del">${escapeHtml(line)}</span>`;
+                } else if (line.startsWith('@@') || line.startsWith('diff ') || line.startsWith('index ')) {
+                    return `<span class="diff-header">${escapeHtml(line)}</span>`;
+                }
+                return escapeHtml(line);
+            }).join('\n');
+        }
+
+        // Close modal on escape
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeDiffModal();
+            }
+        });
+
+        // Close modal on background click
+        document.getElementById('diff-modal').addEventListener('click', (e) => {
+            if (e.target === document.getElementById('diff-modal')) {
+                closeDiffModal();
+            }
+        });
+
+        // Initialize
+        init();
+    </script>
+</body>
+</html>

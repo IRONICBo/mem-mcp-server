@@ -215,6 +215,34 @@ mem --help
 
 </details>
 
+## Web UI
+
+MemoV includes a visual timeline browser for exploring your commit history.
+
+### Installation
+
+```bash
+# From source
+uv pip install -e ".[web]"
+
+# Or with uvx
+uvx --from "git+https://github.com/memovai/memov.git[web]" mem web
+```
+
+### Usage
+
+```bash
+mem web --loc /path/to/project
+```
+
+Opens a web interface at `http://localhost:38888` with:
+
+- **Timeline View**: Visual commit history with expandable cards showing prompts, plans, and file changes
+- **Branch Filtering**: Click branches in sidebar to filter commits and auto-scroll to branch tip
+- **Skeleton Mode**: Toggle compact view showing only dots and lines for quick navigation
+- **Diff Viewer**: Click "View Diff" to see code changes for any commit
+- **Jump**: Restore project state to any previous snapshot
+
 ## Installation for Contributors
 
 Please see [docs/installation_for_dev.md](docs/installation_for_dev.md) for detailed installation instructions.
