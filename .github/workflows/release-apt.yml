@@ -58,8 +58,10 @@ jobs:
           ls -la "${ASSET_NAME}"
           file "${ASSET_NAME}"
 
+          # Extract tarball - onedir format extracts to mem/ directory
           tar -xzf "${ASSET_NAME}"
-          chmod +x mem-linux-x86_64
+          ls -la mem/
+          chmod +x mem/mem
 
       - name: Build DEB package
         run: |
@@ -69,11 +71,16 @@ jobs:
 
           PKG_DIR="${PKG_NAME}_${VERSION}_${ARCH}"
           mkdir -p "${PKG_DIR}/DEBIAN"
+          mkdir -p "${PKG_DIR}/usr/lib/mem"
           mkdir -p "${PKG_DIR}/usr/bin"
           mkdir -p "${PKG_DIR}/usr/share/doc/${PKG_NAME}"
 
-          cp "mem-linux-x86_64" "${PKG_DIR}/usr/bin/mem"
-          chmod 755 "${PKG_DIR}/usr/bin/mem"
+          # Copy entire onedir package (binary + _internal)
+          cp -r mem/* "${PKG_DIR}/usr/lib/mem/"
+          chmod 755 "${PKG_DIR}/usr/lib/mem/mem"
+
+          # Create symlink script
+          ln -sf /usr/lib/mem/mem "${PKG_DIR}/usr/bin/mem"
 
           cat > "${PKG_DIR}/DEBIAN/control" << EOF
           Package: ${PKG_NAME}

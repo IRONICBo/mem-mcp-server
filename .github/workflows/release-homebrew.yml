@@ -110,14 +110,28 @@ jobs:
             end
 
             def install
-              if OS.mac?
-                if Hardware::CPU.intel?
-                  bin.install "mem-macos-x86_64" => "mem"
-                else
-                  bin.install "mem-macos-arm64" => "mem"
-                end
+              # onedir format: tarball extracts to mem/ directory, brew cd's into it
+              # so we see: mem (binary) + _internal/ (dependencies)
+              if File.directory?("_internal") && File.executable?("mem")
+                # Install binary and _internal to libexec (keeps them together)
+                libexec.install "mem"
+                libexec.install "_internal"
+                # Create symlink in bin
+                bin.install_symlink libexec/"mem"
+              elsif File.exist?("mem") && File.executable?("mem")
+                # Single binary (onefile mode)
+                bin.install "mem"
               else
-                bin.install "mem-linux-x86_64" => "mem"
+                # Fallback for legacy named binary format
+                if OS.mac?
+                  if Hardware::CPU.intel?
+                    bin.install "mem-macos-x86_64" => "mem"
+                  else
+                    bin.install "mem-macos-arm64" => "mem"
+                  end
+                else
+                  bin.install "mem-linux-x86_64" => "mem"
+                end
               end
             end
 

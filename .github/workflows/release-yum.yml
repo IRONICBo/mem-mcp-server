@@ -63,8 +63,10 @@ jobs:
           ls -la "${ASSET_NAME}"
           file "${ASSET_NAME}"
 
+          # Extract tarball - onedir format extracts to mem/ directory
           tar -xzf "${ASSET_NAME}"
-          chmod +x mem-linux-x86_64
+          ls -la mem/
+          chmod +x mem/mem
 
       - name: Build RPM package
         run: |
@@ -73,7 +75,8 @@ jobs:
           ARCH="x86_64"
 
           mkdir -p ~/rpmbuild/{SPECS,SOURCES,BUILD,RPMS,SRPMS}
-          cp "mem-linux-x86_64" ~/rpmbuild/SOURCES/mem
+          # Copy entire onedir package
+          cp -r mem ~/rpmbuild/SOURCES/
 
           cat > ~/rpmbuild/SPECS/${PKG_NAME}.spec << EOF
           Name:           ${PKG_NAME}
@@ -87,11 +90,16 @@ jobs:
           Memory layer for AI coding agents
 
           %install
+          mkdir -p %{buildroot}/usr/lib/mem
           mkdir -p %{buildroot}/usr/bin
-          cp %{_sourcedir}/mem %{buildroot}/usr/bin/mem
-          chmod 755 %{buildroot}/usr/bin/mem
+          # Install entire onedir package
+          cp -r %{_sourcedir}/mem/* %{buildroot}/usr/lib/mem/
+          chmod 755 %{buildroot}/usr/lib/mem/mem
+          # Create symlink
+          ln -sf /usr/lib/mem/mem %{buildroot}/usr/bin/mem
 
           %files
+          /usr/lib/mem
           /usr/bin/mem
           EOF
 

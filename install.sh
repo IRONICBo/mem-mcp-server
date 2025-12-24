@@ -9,7 +9,8 @@
 #
 # Environment variables:
 #   MEM_VERSION   - Specific version to install (default: latest)
-#   MEM_INSTALL_DIR - Installation directory (default: /usr/local/bin)
+#   MEM_INSTALL_DIR - Binary/symlink directory (default: /usr/local/bin)
+#   MEM_LIB_DIR   - Library directory for onedir mode (default: /usr/local/lib/mem)
 #
 
 set -e
@@ -25,6 +26,7 @@ NC='\033[0m' # No Color
 GITHUB_REPO="memovai/memov"
 BINARY_NAME="mem"
 INSTALL_DIR="${MEM_INSTALL_DIR:-/usr/local/bin}"
+LIB_DIR="${MEM_LIB_DIR:-/usr/local/lib/mem}"
 
 # Functions
 info() {
@@ -84,7 +86,7 @@ get_latest_version() {
 
 # Download and install
 install_mem() {
-    local platform version download_url temp_dir archive_name binary_path
+    local platform version download_url temp_dir archive_name binary_path is_onedir
 
     platform=$(detect_platform)
     info "Detected platform: $platform"
@@ -98,10 +100,15 @@ install_mem() {
         info "Installing latest version: $version"
     fi
 
-    # Determine download URL
+    # Determine download URL and type
+    # We use onedir mode for better startup performance on macOS
+    is_onedir=true
     case "$platform" in
         linux-x86_64)
             archive_name="mem-linux-x86_64.tar.gz"
+            ;;
+        linux-arm64)
+            archive_name="mem-linux-arm64.tar.gz"
             ;;
         macos-x86_64)
             archive_name="mem-macos-x86_64.tar.gz"
@@ -110,7 +117,7 @@ install_mem() {
             archive_name="mem-macos-arm64.tar.gz"
             ;;
         windows-x86_64)
-            archive_name="mem-windows-x86_64.exe.zip"
+            archive_name="mem-windows-x86_64.zip"
             ;;
         *)
             error "No binary available for platform: $platform"
@@ -138,19 +145,86 @@ install_mem() {
     case "$archive_name" in
         *.tar.gz)
             tar -xzf "$archive_name"
-            binary_path=$(find . -type f -name "mem-*" ! -name "*.tar.gz" | head -1)
             ;;
         *.zip)
             unzip -q "$archive_name"
-            binary_path=$(find . -type f -name "mem-*.exe" | head -1)
             ;;
     esac
 
-    if [ -z "$binary_path" ] || [ ! -f "$binary_path" ]; then
-        error "Failed to extract binary"
+    # Detect if this is onedir (has mem/ directory) or single binary
+    if [ -d "mem" ] && [ -f "mem/mem" ]; then
+        # onedir mode - directory with mem/mem binary and mem/_internal/
+        info "Detected onedir package (fast startup mode)"
+        install_onedir "$temp_dir/mem"
+    elif [ -d "mem" ] && [ -f "mem/_internal" ]; then
+        # onedir mode variant
+        info "Detected onedir package (fast startup mode)"
+        install_onedir "$temp_dir/mem"
+    else
+        # Single binary mode (legacy or shiv)
+        binary_path=$(find . -type f \( -name "mem" -o -name "mem-*" \) ! -name "*.tar.gz" ! -name "*.zip" | head -1)
+        if [ -z "$binary_path" ] || [ ! -f "$binary_path" ]; then
+            error "Failed to find binary in archive"
+        fi
+        info "Detected single binary package"
+        install_single_binary "$binary_path"
     fi
 
-    # Install
+    # Verify installation
+    verify_installation
+}
+
+# Install onedir package (directory with binary + libraries)
+install_onedir() {
+    local source_dir="$1"
+
+    info "Installing to $LIB_DIR (library files)"
+    info "Creating symlink at $INSTALL_DIR/$BINARY_NAME"
+
+    # Remove old installation if exists
+    if [ -d "$LIB_DIR" ]; then
+        warn "Removing old installation at $LIB_DIR"
+        if [ -w "$(dirname "$LIB_DIR")" ]; then
+            rm -rf "$LIB_DIR"
+        else
+            sudo rm -rf "$LIB_DIR"
+        fi
+    fi
+
+    # Remove old symlink if exists
+    if [ -L "$INSTALL_DIR/$BINARY_NAME" ] || [ -f "$INSTALL_DIR/$BINARY_NAME" ]; then
+        if [ -w "$INSTALL_DIR" ]; then
+            rm -f "$INSTALL_DIR/$BINARY_NAME"
+        else
+            sudo rm -f "$INSTALL_DIR/$BINARY_NAME"
+        fi
+    fi
+
+    # Install library directory
+    if [ -w "$(dirname "$LIB_DIR")" ]; then
+        cp -r "$source_dir" "$LIB_DIR"
+        chmod +x "$LIB_DIR/mem"
+    else
+        warn "Need sudo to install to $LIB_DIR"
+        sudo cp -r "$source_dir" "$LIB_DIR"
+        sudo chmod +x "$LIB_DIR/mem"
+    fi
+
+    # Create symlink
+    if [ -w "$INSTALL_DIR" ]; then
+        ln -sf "$LIB_DIR/mem" "$INSTALL_DIR/$BINARY_NAME"
+    else
+        sudo ln -sf "$LIB_DIR/mem" "$INSTALL_DIR/$BINARY_NAME"
+    fi
+
+    success "Installed library to: $LIB_DIR"
+    success "Created symlink: $INSTALL_DIR/$BINARY_NAME -> $LIB_DIR/mem"
+}
+
+# Install single binary (legacy mode or shiv)
+install_single_binary() {
+    local binary_path="$1"
+
     info "Installing to $INSTALL_DIR/$BINARY_NAME"
 
     if [ -w "$INSTALL_DIR" ]; then
@@ -161,14 +235,21 @@ install_mem() {
         sudo mv "$binary_path" "$INSTALL_DIR/$BINARY_NAME"
         sudo chmod +x "$INSTALL_DIR/$BINARY_NAME"
     fi
+}
 
-    # Verify installation
+# Verify installation
+verify_installation() {
     if command -v "$BINARY_NAME" &>/dev/null; then
         success "MEM installed successfully!"
         echo ""
-        "$INSTALL_DIR/$BINARY_NAME" --version 2>/dev/null || "$INSTALL_DIR/$BINARY_NAME" version 2>/dev/null || true
+        "$INSTALL_DIR/$BINARY_NAME" version 2>/dev/null || "$INSTALL_DIR/$BINARY_NAME" --version 2>/dev/null || true
         echo ""
         info "Run 'mem --help' to get started"
+
+        # Show startup time hint for first run
+        echo ""
+        info "Note: First run may take a few seconds (macOS security scan)."
+        info "Subsequent runs will be fast (~0.2s)."
     else
         warn "MEM installed to $INSTALL_DIR/$BINARY_NAME but not in PATH"
         info "Add $INSTALL_DIR to your PATH or run: $INSTALL_DIR/$BINARY_NAME --help"
