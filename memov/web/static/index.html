@@ -530,6 +530,28 @@
         // Fetch and render data
         async function init() {
             try {
+                // First check if memov is initialized
+                const statusRes = await fetch('/api/status');
+                const status = await statusRes.json();
+
+                if (!status.initialized) {
+                    document.getElementById('branches-list').innerHTML =
+                        '<div class="empty">Not initialized</div>';
+                    document.getElementById('timeline').innerHTML = `
+                        <div class="empty">
+                            <h3>MemoV Not Initialized</h3>
+                            <p>This project hasn't been set up with MemoV yet.</p>
+                            <p style="margin-top: 16px; font-family: monospace; background: #f5f5f5; padding: 12px; border-radius: 4px;">
+                                cd ${escapeHtml(status.project_path)}<br>
+                                mem init
+                            </p>
+                            <p style="margin-top: 16px; color: #666;">Then refresh this page.</p>
+                        </div>
+                    `;
+                    document.getElementById('branch-info').textContent = 'Not initialized';
+                    return;
+                }
+
                 const [branchesRes, graphRes] = await Promise.all([
                     fetch('/api/branches'),
                     fetch('/api/graph')
@@ -539,11 +561,13 @@
                 graphData = await graphRes.json();
                 branchesData = branches;
 
-                // Build childToParent mapping from edges
+                // Build childToParent mapping from edges (skip duplicates)
                 childToParent = {};
                 if (graphData.edges) {
                     graphData.edges.forEach(e => {
-                        childToParent[e.to] = e.from;
+                        if (!childToParent[e.to]) {
+                            childToParent[e.to] = e.from;
+                        }
                     });
                 }
 
@@ -555,7 +579,7 @@
             } catch (error) {
                 console.error('Failed to load data:', error);
                 document.getElementById('timeline').innerHTML =
-                    '<div class="empty"><h3>Error loading data</h3><p>Make sure memov is initialized.</p></div>';
+                    '<div class="empty"><h3>Error loading data</h3><p>Check server connection and try again.</p></div>';
             }
         }
 
@@ -596,12 +620,29 @@
                 return;
             }
 
-            // Sort nodes by timestamp (most recent first)
-            const sortedNodes = [...data.nodes].sort((a, b) => {
-                if (!a.timestamp) return 1;
-                if (!b.timestamp) return -1;
-                return new Date(b.timestamp) - new Date(a.timestamp);
-            });
+            // Topological sort (like git rev-list --reverse): parent before child
+            // Then reverse for display (most recent/child first)
+            const nodeMap = new Map(data.nodes.map(n => [n.id, n]));
+            const visited = new Set();
+            const sorted = [];
+
+            // DFS to get topological order
+            function visit(nodeId) {
+                if (visited.has(nodeId)) return;
+                visited.add(nodeId);
+                // Visit parent first (if exists)
+                const parentId = childToParent[nodeId];
+                if (parentId && nodeMap.has(parentId)) {
+                    visit(parentId);
+                }
+                sorted.push(nodeMap.get(nodeId));
+            }
+
+            // Visit all nodes
+            data.nodes.forEach(n => visit(n.id));
+
+            // Reverse: child (newest) first for display
+            const sortedNodes = sorted.reverse();
 
             container.innerHTML = sortedNodes.map(node => `
                 <div class="node" data-id="${node.id}">

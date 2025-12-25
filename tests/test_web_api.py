@@ -172,6 +172,92 @@ class TestIndexPage:
         assert response.status_code in [200, 404]
 
 
+class TestJumpParentRelationship:
+    """Tests for verifying parent relationships after jump."""
+
+    def test_snap_after_jump_has_correct_parent(
+        self, web_client_with_data, temp_project, memov_with_snapshots
+    ):
+        """Test that a snap after jump uses jumped-to commit as parent."""
+        # Get graph before jump
+        graph_before = web_client_with_data.get("/api/graph").json()
+        nodes = graph_before["nodes"]
+        if len(nodes) < 2:
+            pytest.skip("Need at least 2 commits to test jump parent")
+
+        # Find the commit hashes - nodes[0] is newest, nodes[-1] is oldest
+        # We'll jump to an older commit
+        target_commit = nodes[-1]["id"]  # Jump to oldest
+        newest_before_jump = nodes[0]["id"]
+
+        # Jump to the older commit
+        response = web_client_with_data.post(f"/api/jump/{target_commit}")
+        assert response.status_code == 200
+        assert response.json()["status"] == "success"
+
+        # Make a change and create new snapshot
+        (temp_project / "test.py").write_text("# After jump\nprint('new code')\n")
+        memov_with_snapshots.snapshot(
+            prompt="Change after jump",
+            response="Made changes after jumping",
+            by_user=False,
+        )
+
+        # Get graph after snap
+        graph_after = web_client_with_data.get("/api/graph").json()
+
+        # Find the new commit (should be on jump/1 branch)
+        branches = web_client_with_data.get("/api/branches").json()
+        new_branch = branches["current"]
+        assert "jump" in new_branch
+
+        # Find edges pointing to the new commit
+        new_commit_tip = branches["branches"][new_branch]
+
+        # Build parent lookup from edges
+        child_to_parent = {}
+        for edge in graph_after["edges"]:
+            # edge: {"from": parent, "to": child}
+            if edge["to"] not in child_to_parent:
+                child_to_parent[edge["to"]] = edge["from"]
+
+        # Verify the new commit's parent is the jumped-to commit
+        assert (
+            new_commit_tip in child_to_parent
+        ), f"New commit {new_commit_tip[:7]} should have a parent edge"
+        actual_parent = child_to_parent[new_commit_tip]
+        assert actual_parent == target_commit, (
+            f"New commit's parent should be {target_commit[:7]} (jumped-to), "
+            f"but was {actual_parent[:7]}"
+        )
+
+
+class TestStatusEndpoint:
+    """Tests for /api/status endpoint."""
+
+    def test_status_initialized(self, web_client, temp_project):
+        """Test status returns initialized=True for initialized memov."""
+        response = web_client.get("/api/status")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["initialized"] is True
+        assert data["project_path"] == str(temp_project)
+
+    def test_status_not_initialized(self, temp_project):
+        """Test status returns initialized=False for uninitialized project."""
+        if not FASTAPI_AVAILABLE:
+            pytest.skip("FastAPI not installed")
+
+        app = create_app(str(temp_project))
+        client = TestClient(app)
+
+        response = client.get("/api/status")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["initialized"] is False
+        assert data["project_path"] == str(temp_project)
+
+
 class TestNotInitialized:
     """Tests for handling uninitialized memov."""
 

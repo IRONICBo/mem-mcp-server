@@ -34,6 +34,16 @@ def create_app(project_path: str) -> "FastAPI":
     app = FastAPI(title="MemoV Web UI", version="1.0.0")
 
     # API Routes
+    @app.get("/api/status")
+    def get_status():
+        """Get memov initialization status."""
+        manager = MemovManager(project_path=_project_path)
+        initialized = manager.check() is MemStatus.SUCCESS
+        return {
+            "initialized": initialized,
+            "project_path": _project_path,
+        }
+
     @app.get("/api/branches")
     def get_branches():
         """Get all branches and current branch."""
@@ -168,13 +178,13 @@ def start_server(project_path: str, port: int = 38888, host: str = "127.0.0.1"):
         print(f"Error: Project path '{project_path}' does not exist.")
         return
 
+    app = create_app(project_path)
+
+    # Check initialization status (warning only, don't block)
     manager = MemovManager(project_path=project_path)
     if manager.check() is not MemStatus.SUCCESS:
-        print(f"Error: Memov not initialized in '{project_path}'.")
-        print("Run 'mem init' first.")
-        return
-
-    app = create_app(project_path)
+        print(f"Warning: Memov not initialized in '{project_path}'.")
+        print("Run 'mem init' to initialize, or the UI will show setup instructions.")
 
     print(f"Starting MemoV Web UI...")
     print(f"Project: {project_path}")
