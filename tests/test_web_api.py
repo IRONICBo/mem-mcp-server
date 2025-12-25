@@ -1,0 +1,188 @@
+"""Tests for Web UI API endpoints."""
+
+import pytest
+
+# Skip all tests if fastapi is not installed
+pytest.importorskip("fastapi")
+
+from fastapi.testclient import TestClient
+
+from memov.web.server import FASTAPI_AVAILABLE, create_app
+
+
+@pytest.fixture
+def web_client(initialized_memov, temp_project):
+    """Create a test client for the web API."""
+    if not FASTAPI_AVAILABLE:
+        pytest.skip("FastAPI not installed")
+
+    app = create_app(str(temp_project))
+    return TestClient(app)
+
+
+@pytest.fixture
+def web_client_with_data(memov_with_snapshots, temp_project):
+    """Create a test client with snapshot data."""
+    if not FASTAPI_AVAILABLE:
+        pytest.skip("FastAPI not installed")
+
+    app = create_app(str(temp_project))
+    return TestClient(app)
+
+
+class TestBranchesEndpoint:
+    """Tests for /api/branches endpoint."""
+
+    def test_get_branches_empty(self, web_client):
+        """Test getting branches from fresh memov."""
+        response = web_client.get("/api/branches")
+        assert response.status_code == 200
+        data = response.json()
+        assert "current" in data
+        assert "branches" in data
+
+    def test_get_branches_with_data(self, web_client_with_data):
+        """Test getting branches after snapshots."""
+        response = web_client_with_data.get("/api/branches")
+        assert response.status_code == 200
+        data = response.json()
+        assert data["current"] == "main"
+        assert "main" in data["branches"]
+
+
+class TestGraphEndpoint:
+    """Tests for /api/graph endpoint."""
+
+    def test_get_graph_empty(self, web_client):
+        """Test getting graph from fresh memov."""
+        response = web_client.get("/api/graph")
+        assert response.status_code == 200
+        data = response.json()
+        assert "nodes" in data
+        assert "edges" in data
+        assert "current_branch" in data
+
+    def test_get_graph_with_data(self, web_client_with_data):
+        """Test graph contains node data including agent_plan."""
+        response = web_client_with_data.get("/api/graph")
+        assert response.status_code == 200
+        data = response.json()
+
+        assert len(data["nodes"]) >= 2
+        assert data["current_branch"] == "main"
+
+        # Check node structure
+        node = data["nodes"][0]
+        assert "id" in node
+        assert "short_hash" in node
+        assert "operation" in node
+        assert "prompt" in node
+        assert "response" in node
+        assert "agent_plan" in node
+        assert "files" in node
+
+    def test_graph_edges_structure(self, web_client_with_data):
+        """Test edges represent parent relationships."""
+        response = web_client_with_data.get("/api/graph")
+        data = response.json()
+
+        # With 2+ commits, should have at least 1 edge
+        if len(data["nodes"]) >= 2:
+            assert len(data["edges"]) >= 1
+            edge = data["edges"][0]
+            assert "from" in edge
+            assert "to" in edge
+
+
+class TestCommitEndpoint:
+    """Tests for /api/commit/{commit_hash} endpoint."""
+
+    def test_get_commit_not_found(self, web_client):
+        """Test 404 for non-existent commit."""
+        response = web_client.get("/api/commit/nonexistent")
+        assert response.status_code == 404
+
+    def test_get_commit_by_hash(self, web_client_with_data):
+        """Test getting commit details by hash."""
+        # First get a valid hash from graph
+        graph_response = web_client_with_data.get("/api/graph")
+        nodes = graph_response.json()["nodes"]
+        if not nodes:
+            pytest.skip("No nodes in graph")
+
+        commit_hash = nodes[0]["short_hash"]
+        response = web_client_with_data.get(f"/api/commit/{commit_hash}")
+        assert response.status_code == 200
+
+        data = response.json()
+        assert "commit_hash" in data
+        assert "prompt" in data
+        assert "response" in data
+        assert "agent_plan" in data
+
+
+class TestDiffEndpoint:
+    """Tests for /api/diff/{commit_hash} endpoint."""
+
+    def test_get_diff(self, web_client_with_data):
+        """Test getting diff for a commit."""
+        # Get a valid hash first
+        graph_response = web_client_with_data.get("/api/graph")
+        nodes = graph_response.json()["nodes"]
+        if not nodes:
+            pytest.skip("No nodes in graph")
+
+        commit_hash = nodes[0]["short_hash"]
+        response = web_client_with_data.get(f"/api/diff/{commit_hash}")
+        assert response.status_code == 200
+
+        data = response.json()
+        assert "commit_hash" in data
+        assert "diff" in data
+
+
+class TestJumpEndpoint:
+    """Tests for /api/jump/{commit_hash} endpoint."""
+
+    def test_jump_to_commit(self, web_client_with_data, temp_project):
+        """Test jumping to a specific commit."""
+        # Get graph to find a commit to jump to
+        graph_response = web_client_with_data.get("/api/graph")
+        nodes = graph_response.json()["nodes"]
+        if len(nodes) < 2:
+            pytest.skip("Need at least 2 commits to test jump")
+
+        # Jump to the older commit (index 1 since 0 is newest)
+        target_hash = nodes[1]["short_hash"]
+        response = web_client_with_data.post(f"/api/jump/{target_hash}")
+        assert response.status_code == 200
+
+        data = response.json()
+        assert data["status"] == "success"
+        assert "new_branch" in data
+
+
+class TestIndexPage:
+    """Tests for serving the index page."""
+
+    def test_serve_index(self, web_client):
+        """Test that index.html is served at root."""
+        response = web_client.get("/")
+        # May be 200 or 404 depending on whether static files exist
+        assert response.status_code in [200, 404]
+
+
+class TestNotInitialized:
+    """Tests for handling uninitialized memov."""
+
+    def test_branches_not_initialized(self, temp_project):
+        """Test error when memov not initialized."""
+        if not FASTAPI_AVAILABLE:
+            pytest.skip("FastAPI not installed")
+
+        app = create_app(str(temp_project))
+        client = TestClient(app)
+
+        response = client.get("/api/branches")
+        assert response.status_code == 400
+        assert "not initialized" in response.json()["detail"].lower()
