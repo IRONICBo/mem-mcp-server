@@ -1034,6 +1034,7 @@ name = "memov"
 version = "0.0.1"
 source = { editable = "." }
 dependencies = [
+    { name = "fastapi" },
     { name = "mcp" },
     { name = "pathspec" },
     { name = "psutil" },
@@ -1049,9 +1050,6 @@ rag = [
     { name = "litellm" },
     { name = "numpy" },
 ]
-web = [
-    { name = "fastapi" },
-]
 
 [package.dev-dependencies]
 dev = [
@@ -1064,7 +1062,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "chromadb", marker = "extra == 'rag'", specifier = ">=0.5.0" },
-    { name = "fastapi", marker = "extra == 'web'", specifier = ">=0.100.0" },
+    { name = "fastapi", specifier = ">=0.100.0" },
     { name = "litellm", marker = "extra == 'rag'", specifier = ">=1.0.0" },
     { name = "mcp", specifier = ">=1.13.0" },
     { name = "numpy", marker = "extra == 'rag'", specifier = ">=1.26.0,<2.0.0" },
@@ -1075,7 +1073,7 @@ requires-dist = [
     { name = "typer", specifier = ">=0.16.0" },
     { name = "uvicorn", specifier = ">=0.35.0" },
 ]
-provides-extras = ["web", "rag"]
+provides-extras = ["rag"]
 
 [package.metadata.requires-dev]
 dev = [

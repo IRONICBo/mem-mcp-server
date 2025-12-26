@@ -13,14 +13,10 @@ dependencies = [
     "typer>=0.16.0",
     "uvicorn>=0.35.0",
     "rich>=13.0.0",
-]
-
-[project.optional-dependencies]
-# Web UI mode: Visual commit history browser
-web = [
     "fastapi>=0.100.0",
 ]
 
+[project.optional-dependencies]
 # RAG mode: Semantic search with VectorDB (sync, search commands)
 rag = [
     "chromadb>=0.5.0",

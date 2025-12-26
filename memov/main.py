@@ -487,55 +487,127 @@ def search(
         sys.exit(1)
 
 
-@app.command()
-def web(
+# UI subcommand group for web server management
+ui_app = typer.Typer(help="Web UI server management (start/stop/status)")
+app.add_typer(ui_app, name="ui")
+
+
+@ui_app.callback(invoke_without_command=True)
+def ui_main(
+    ctx: typer.Context,
     loc: LocOption = ".",
     port: Annotated[
         int,
-        typer.Option(
-            "--port",
-            "-p",
-            help="Port to run the web server on",
-        ),
+        typer.Option("--port", "-p", help="Port to run the server on"),
     ] = 38888,
 ) -> None:
-    """Start the MemoV web UI for visualizing commit history.
+    """Start Web UI server in background.
 
-    Opens a local web server at http://localhost:38888 (default port)
-    that displays an interactive timeline of all commits with their
-    prompts, plans, and file changes.
-
-    Example:
-        mem web
-        mem web --port 8080
+    Examples:
+        mem ui                    # Start server for current directory
+        mem ui --loc /path/to/project
+        mem ui status             # Check if server is running
+        mem ui stop               # Stop the server
     """
-    try:
-        from memov.web.server import FASTAPI_AVAILABLE, start_server
+    if ctx.invoked_subcommand is None:
+        # Default action: start server
+        _ui_start(loc=loc, port=port, foreground=False)
 
-        if not FASTAPI_AVAILABLE:
-            console.print(
-                "[red]Error: FastAPI not installed[/red]\n\n"
-                "[yellow]The web UI requires FastAPI and uvicorn.[/yellow]\n"
-                "Install with:\n"
-                "  [cyan]pip install memov[web][/cyan]\n"
-                "or\n"
-                "  [cyan]uv pip install fastapi uvicorn[/cyan]"
-            )
+
+@ui_app.command("start")
+def ui_start(
+    loc: LocOption = ".",
+    port: Annotated[
+        int,
+        typer.Option("--port", "-p", help="Port to run the server on"),
+    ] = 38888,
+    foreground: Annotated[
+        bool,
+        typer.Option("--foreground", "-f", help="Run in foreground (blocking)"),
+    ] = False,
+) -> None:
+    """Start the Web UI server.
+
+    Examples:
+        mem ui start                      # Background mode
+        mem ui start --foreground         # Foreground mode (for debugging)
+        mem ui start --port 8080
+    """
+    _ui_start(loc=loc, port=port, foreground=foreground)
+
+
+def _ui_start(loc: str, port: int, foreground: bool) -> None:
+    """Internal function to start UI server."""
+    from memov.web.manager import UIManager
+    from memov.web.server import start_server
+
+    project_path = os.path.abspath(loc)
+
+    if foreground:
+        # Run in foreground (blocking)
+        console.print(f"[blue]Starting MemoV Web UI (foreground mode)...[/blue]")
+        start_server(project_path=project_path, port=port)
+    else:
+        # Run in background
+        console.print(f"[blue]Starting MemoV Web UI...[/blue]")
+        success, message = UIManager.start(project_path, port=port)
+
+        if success:
+            console.print(f"[green]✓ Server started at {message}[/green]")
+            console.print(f"[dim]Project: {project_path}[/dim]")
+            console.print(f"[dim]Use 'mem ui status' to check, 'mem ui stop' to stop[/dim]")
+        else:
+            console.print(f"[red]✗ {message}[/red]")
             sys.exit(1)
 
-        # Resolve project path
-        project_path = os.path.abspath(loc)
 
-        # Start the server
-        start_server(project_path=project_path, port=port)
+@ui_app.command("status")
+def ui_status(loc: LocOption = ".") -> None:
+    """Show status of the Web UI server.
 
-    except ImportError as e:
-        console.print(f"[red]Import error: {e}[/red]")
-        console.print("[yellow]Install with:[/yellow] [cyan]pip install memov[web][/cyan]")
-        sys.exit(1)
-    except Exception as e:
-        console.print(f"[red]Error starting web server: {e}[/red]")
-        logging.error(f"Web server error: {e}", exc_info=True)
+    Examples:
+        mem ui status
+        mem ui status --loc /path/to/project
+    """
+    from memov.web.manager import UIManager
+
+    project_path = os.path.abspath(loc)
+    servers = UIManager.status(project_path)
+
+    if not servers:
+        console.print(f"[yellow]No server running for {project_path}[/yellow]")
+        return
+
+    for server in servers:
+        uptime = UIManager.format_uptime(server["uptime_seconds"])
+        console.print(f"[green]MemoV Web UI Status[/green]")
+        console.print(f"  [bold]Project:[/bold]  {server['project_path']}")
+        console.print(f"  [bold]URL:[/bold]      {server['url']}")
+        console.print(f"  [bold]PID:[/bold]      {server['pid']}")
+        console.print(f"  [bold]Uptime:[/bold]   {uptime}")
+        console.print(f"  [bold]Memory:[/bold]   {server['memory_mb']} MB")
+        console.print(f"  [bold]Status:[/bold]   [green]{server['status']}[/green]")
+
+
+@ui_app.command("stop")
+def ui_stop(loc: LocOption = ".") -> None:
+    """Stop the Web UI server.
+
+    Examples:
+        mem ui stop
+        mem ui stop --loc /path/to/project
+    """
+    from memov.web.manager import UIManager
+
+    project_path = os.path.abspath(loc)
+    console.print(f"[blue]Stopping MemoV Web UI...[/blue]")
+
+    success, message = UIManager.stop(project_path)
+
+    if success:
+        console.print(f"[green]✓ {message}[/green]")
+    else:
+        console.print(f"[red]✗ {message}[/red]")
         sys.exit(1)
 
 

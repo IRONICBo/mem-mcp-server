@@ -5,15 +5,10 @@ import os
 from pathlib import Path
 from typing import Optional
 
-try:
-    import uvicorn
-    from fastapi import FastAPI, HTTPException
-    from fastapi.responses import HTMLResponse, JSONResponse
-    from fastapi.staticfiles import StaticFiles
-
-    FASTAPI_AVAILABLE = True
-except ImportError:
-    FASTAPI_AVAILABLE = False
+import uvicorn
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 
 from memov.core.manager import MemovManager, MemStatus
 
@@ -27,9 +22,6 @@ def create_app(project_path: str) -> "FastAPI":
     """Create FastAPI application with routes."""
     global _project_path
     _project_path = project_path
-
-    if not FASTAPI_AVAILABLE:
-        raise ImportError("FastAPI not installed. Install with: pip install memov[web]")
 
     app = FastAPI(title="MemoV Web UI", version="1.0.0")
 
@@ -167,12 +159,6 @@ def create_app(project_path: str) -> "FastAPI":
 
 def start_server(project_path: str, port: int = 38888, host: str = "127.0.0.1"):
     """Start the MemoV web server."""
-    if not FASTAPI_AVAILABLE:
-        print("Error: FastAPI not installed.")
-        print("Install with: pip install memov[web]")
-        print("Or: uv pip install fastapi uvicorn")
-        return
-
     # Validate project path
     if not os.path.exists(project_path):
         print(f"Error: Project path '{project_path}' does not exist.")

@@ -1,21 +1,14 @@
 """Tests for Web UI API endpoints."""
 
 import pytest
-
-# Skip all tests if fastapi is not installed
-pytest.importorskip("fastapi")
-
 from fastapi.testclient import TestClient
 
-from memov.web.server import FASTAPI_AVAILABLE, create_app
+from memov.web.server import create_app
 
 
 @pytest.fixture
 def web_client(initialized_memov, temp_project):
     """Create a test client for the web API."""
-    if not FASTAPI_AVAILABLE:
-        pytest.skip("FastAPI not installed")
-
     app = create_app(str(temp_project))
     return TestClient(app)
 
@@ -23,9 +16,6 @@ def web_client(initialized_memov, temp_project):
 @pytest.fixture
 def web_client_with_data(memov_with_snapshots, temp_project):
     """Create a test client with snapshot data."""
-    if not FASTAPI_AVAILABLE:
-        pytest.skip("FastAPI not installed")
-
     app = create_app(str(temp_project))
     return TestClient(app)
 
@@ -245,9 +235,6 @@ class TestStatusEndpoint:
 
     def test_status_not_initialized(self, temp_project):
         """Test status returns initialized=False for uninitialized project."""
-        if not FASTAPI_AVAILABLE:
-            pytest.skip("FastAPI not installed")
-
         app = create_app(str(temp_project))
         client = TestClient(app)
 
@@ -263,9 +250,6 @@ class TestNotInitialized:
 
     def test_branches_not_initialized(self, temp_project):
         """Test error when memov not initialized."""
-        if not FASTAPI_AVAILABLE:
-            pytest.skip("FastAPI not installed")
-
         app = create_app(str(temp_project))
         client = TestClient(app)
 
