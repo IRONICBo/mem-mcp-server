@@ -486,6 +486,14 @@
             stroke: #999;
         }
 
+        .tree-jump-arrow {
+            stroke: #e74c3c;
+            stroke-width: 2;
+            stroke-dasharray: 6 3;
+            fill: none;
+            marker-end: url(#jump-arrowhead);
+        }
+
         .tree-lane-label {
             font-size: 11px;
             fill: #999;
@@ -896,7 +904,9 @@
             const padding = 40;
             const labelHeight = 30;
 
-            const svgWidth = numLanes * laneWidth + padding * 2;
+            // Extra width for jump arrows that curve to the right
+            const jumpArrowSpace = (graphData.jump_edges && graphData.jump_edges.length > 0) ? 60 : 0;
+            const svgWidth = numLanes * laneWidth + padding * 2 + jumpArrowSpace;
             const svgHeight = (maxDepth + 1) * rowHeight + padding * 2 + labelHeight;
 
             // Calculate node positions
@@ -961,9 +971,36 @@
                 `;
             });
 
+            // Draw jump arrows (from source commit to target commit)
+            if (graphData.jump_edges) {
+                graphData.jump_edges.forEach(jumpEdge => {
+                    const fromPos = nodePositions[jumpEdge.from_commit];
+                    const toPos = nodePositions[jumpEdge.to_commit];
+
+                    if (!fromPos || !toPos) return;
+
+                    // Draw curved arrow from source to target
+                    // Arrow goes from the commit we were at, to the commit we jumped to
+                    const dx = toPos.x - fromPos.x;
+                    const dy = toPos.y - fromPos.y;
+
+                    // Control point for curve (offset to the right to make it visible)
+                    const offsetX = Math.max(40, Math.abs(dx) * 0.3);
+                    const ctrlX = Math.max(fromPos.x, toPos.x) + offsetX;
+                    const ctrlY = (fromPos.y + toPos.y) / 2;
+
+                    svgContent += `<path class="tree-jump-arrow" d="M${fromPos.x},${fromPos.y} Q${ctrlX},${ctrlY} ${toPos.x},${toPos.y}"/>`;
+                });
+            }
+
             container.innerHTML = `
                 <div class="tree-view">
                     <svg width="${svgWidth}" height="${svgHeight}" viewBox="0 0 ${svgWidth} ${svgHeight}">
+                        <defs>
+                            <marker id="jump-arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                                <polygon points="0 0, 10 3.5, 0 7" fill="#e74c3c"/>
+                            </marker>
+                        </defs>
                         ${svgContent}
                     </svg>
                 </div>

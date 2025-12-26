@@ -901,9 +901,24 @@ class MemovManager:
                 tar.extractall(self.project_path)
 
             # Auto-create a new branch at this commit
+            # Record where we jumped from (the previous HEAD)
+            previous_branch = branches.get("current", "main")
+            previous_head = branches["branches"].get(previous_branch)
+
             new_branch = self._generate_jump_branch_name(branches)
             branches["branches"][new_branch] = full_hash
             branches["current"] = new_branch
+
+            # Record jump metadata: from which commit we jumped
+            if "jump_from" not in branches:
+                branches["jump_from"] = {}
+            if previous_head and previous_head != full_hash:
+                branches["jump_from"][new_branch] = {
+                    "from_commit": previous_head,
+                    "to_commit": full_hash,
+                    "from_branch": previous_branch,
+                }
+
             self._save_branches(branches)
             GitManager.update_ref(self.bare_repo_path, "refs/memov/HEAD", full_hash)
 

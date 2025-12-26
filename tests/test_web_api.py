@@ -151,6 +151,46 @@ class TestJumpEndpoint:
         assert data["status"] == "success"
         assert "new_branch" in data
 
+    def test_jump_records_source_commit(self, web_client_with_data, temp_project):
+        """Test that jump records the source commit in jump_edges."""
+        # Get branches to find the actual current tip
+        branches_before = web_client_with_data.get("/api/branches").json()
+        current_branch = branches_before["current"]
+        source_commit = branches_before["branches"][current_branch]
+
+        # Get graph to find the oldest commit
+        graph_before = web_client_with_data.get("/api/graph").json()
+        nodes = graph_before["nodes"]
+        if len(nodes) < 2:
+            pytest.skip("Need at least 2 commits to test jump")
+
+        # Find a commit that is not the current tip
+        target_commit = None
+        for node in nodes:
+            if node["id"] != source_commit:
+                target_commit = node["id"]
+                break
+
+        if not target_commit:
+            pytest.skip("Need a different commit to jump to")
+
+        # Jump to the older commit
+        response = web_client_with_data.post(f"/api/jump/{target_commit}")
+        assert response.status_code == 200
+
+        # Get graph after jump
+        graph_after = web_client_with_data.get("/api/graph").json()
+
+        # Check jump_edges contains the jump info
+        assert "jump_edges" in graph_after
+        assert len(graph_after["jump_edges"]) >= 1
+
+        # Find the jump edge for this jump
+        jump_edge = graph_after["jump_edges"][-1]
+        assert jump_edge["from_commit"] == source_commit
+        assert jump_edge["to_commit"] == target_commit
+        assert "jump" in jump_edge["branch"]
+
 
 class TestIndexPage:
     """Tests for serving the index page."""

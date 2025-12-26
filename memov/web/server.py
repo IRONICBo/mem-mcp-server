@@ -99,9 +99,22 @@ def create_app(project_path: str) -> "FastAPI":
                         }
                     )
 
+        # Get jump edges (from which commit to which commit when user did jump)
+        jump_edges = []
+        if branches and "jump_from" in branches:
+            for branch_name, jump_info in branches["jump_from"].items():
+                jump_edges.append(
+                    {
+                        "from_commit": jump_info["from_commit"],
+                        "to_commit": jump_info["to_commit"],
+                        "branch": branch_name,
+                    }
+                )
+
         return {
             "nodes": nodes,
             "edges": edges,
+            "jump_edges": jump_edges,
             "current_branch": branches.get("current") if branches else None,
         }
 
