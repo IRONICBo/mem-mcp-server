@@ -109,6 +109,10 @@
             color: #ccc;
         }
 
+        .branch-item.active {
+            border: 1.5px solid #333;
+        }
+
         /* Timeline */
         .timeline {
             flex: 1;
@@ -681,7 +685,7 @@
 
             container.innerHTML = Object.entries(branches.branches)
                 .map(([name, hash]) => `
-                    <div class="branch-item ${name === branches.current ? 'current' : ''}"
+                    <div class="branch-item ${name === branches.current ? 'active' : ''}"
                          onclick="showBranchView('${name}')">
                         ${name}
                         <span class="count">${branchCommitCounts[name] || 0}</span>
