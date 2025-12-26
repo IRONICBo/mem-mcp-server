@@ -99,9 +99,22 @@ def create_app(project_path: str) -> "FastAPI":
                         }
                     )
 
-        # Get jump edges (from which commit to which commit when user did jump)
+        # Get jump edges from exploration history (jump.json)
+        # Falls back to branches.json jump_from for backward compatibility
         jump_edges = []
-        if branches and "jump_from" in branches:
+        jump_history = manager._load_jump_history()
+        if jump_history and jump_history.get("history"):
+            # Use jump.json (preferred)
+            for jump_record in jump_history["history"]:
+                jump_edges.append(
+                    {
+                        "from_commit": jump_record["from_commit"],
+                        "to_commit": jump_record["to_commit"],
+                        "branch": jump_record["new_branch"],
+                    }
+                )
+        elif branches and "jump_from" in branches:
+            # Fallback to branches.json for backward compatibility
             for branch_name, jump_info in branches["jump_from"].items():
                 jump_edges.append(
                     {

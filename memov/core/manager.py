@@ -922,6 +922,15 @@ class MemovManager:
             self._save_branches(branches)
             GitManager.update_ref(self.bare_repo_path, "refs/memov/HEAD", full_hash)
 
+            # Record jump in exploration history (jump.json)
+            if previous_head and previous_head != full_hash:
+                self._record_jump(
+                    from_commit=previous_head,
+                    to_commit=full_hash,
+                    from_branch=previous_branch,
+                    new_branch=new_branch,
+                )
+
             LOGGER.info(f"Jumped to commit {full_hash[:7]} and created branch '{new_branch}'.")
             return MemStatus.SUCCESS, new_branch
         except Exception as e:
@@ -1236,6 +1245,42 @@ class MemovManager:
         """Save branches configuration to the branches config file."""
         with open(self.branches_config_path, "w") as f:
             json.dump(data, f, indent=2)
+
+    def _load_jump_history(self) -> dict:
+        """Load exploration history from jump.json."""
+        jump_file = Path(self.mem_root_path) / "jump.json"
+        if not jump_file.exists():
+            return {"history": []}
+        try:
+            with open(jump_file, "r") as f:
+                return json.load(f)
+        except (json.JSONDecodeError, IOError):
+            return {"history": []}
+
+    def _save_jump_history(self, data: dict) -> None:
+        """Save exploration history to jump.json."""
+        jump_file = Path(self.mem_root_path) / "jump.json"
+        with open(jump_file, "w") as f:
+            json.dump(data, f, indent=2)
+
+    def _record_jump(
+        self, from_commit: str, to_commit: str, from_branch: str, new_branch: str
+    ) -> None:
+        """Record a jump action in exploration history."""
+        data = self._load_jump_history()
+        next_id = max([h["id"] for h in data["history"]], default=0) + 1
+        data["history"].append(
+            {
+                "id": next_id,
+                "timestamp": datetime.now().isoformat(),
+                "action": "jump",
+                "from_commit": from_commit,
+                "to_commit": to_commit,
+                "from_branch": from_branch,
+                "new_branch": new_branch,
+            }
+        )
+        self._save_jump_history(data)
 
     def _next_develop_branch(self, branches: dict[str, str]) -> str:
         """Find the next available develop branch name based on existing branches."""
