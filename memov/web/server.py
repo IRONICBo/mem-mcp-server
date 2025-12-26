@@ -82,6 +82,7 @@ def create_app(project_path: str) -> "FastAPI":
                     "files": entry["files"],
                     "timestamp": entry["timestamp"],
                     "author": entry["author"],
+                    "diff": entry.get("diff", {}),
                 }
             )
 
