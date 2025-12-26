@@ -407,6 +407,91 @@
             font-weight: 500;
         }
 
+        /* ALL button for tree view */
+        .view-all-btn {
+            display: block;
+            width: 100%;
+            padding: 8px 10px;
+            margin-bottom: 12px;
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+            color: #555;
+            text-align: center;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            transition: all 0.15s;
+        }
+
+        .view-all-btn:hover {
+            background: #eee;
+            border-color: #ccc;
+        }
+
+        .view-all-btn.active {
+            background: #333;
+            color: white;
+            border-color: #333;
+        }
+
+        /* Tree view container */
+        .tree-view {
+            padding: 20px;
+            overflow-x: auto;
+        }
+
+        .tree-view svg {
+            display: block;
+        }
+
+        .tree-node {
+            cursor: pointer;
+        }
+
+        .tree-node circle {
+            fill: #fff;
+            stroke: #999;
+            stroke-width: 2;
+            transition: all 0.15s;
+        }
+
+        .tree-node:hover circle {
+            stroke: #333;
+            transform: scale(1.2);
+            transform-origin: center;
+        }
+
+        .tree-node.head circle {
+            fill: #333;
+            stroke: #333;
+        }
+
+        .tree-node text {
+            font-family: 'SF Mono', Consolas, monospace;
+            font-size: 10px;
+            fill: #666;
+        }
+
+        .tree-edge {
+            stroke: #ddd;
+            stroke-width: 2;
+            fill: none;
+        }
+
+        .tree-edge.jump {
+            stroke-dasharray: 4 2;
+            stroke: #999;
+        }
+
+        .tree-lane-label {
+            font-size: 11px;
+            fill: #999;
+            text-anchor: middle;
+        }
+
     </style>
 </head>
 <body>
@@ -418,6 +503,7 @@
     <div class="container">
         <div class="sidebar">
             <h2>Branches</h2>
+            <button class="view-all-btn" id="view-all-btn" onclick="showAllTree()">ALL</button>
             <div id="branches-list">
                 <div class="loading">Loading...</div>
             </div>
@@ -446,6 +532,7 @@
         let branchesData = null;
         let childToParent = {};
         let expandedNode = null;
+        let viewMode = 'branch'; // 'branch' | 'all'
 
         // Fetch and render data
         async function init() {
@@ -529,7 +616,7 @@
             container.innerHTML = Object.entries(branches.branches)
                 .map(([name, hash]) => `
                     <div class="branch-item ${name === branches.current ? 'current' : ''}"
-                         onclick="filterBranch('${name}')">
+                         onclick="showBranchView('${name}')">
                         ${name}
                         <span class="count">${branchCommitCounts[name] || 0}</span>
                     </div>
@@ -721,6 +808,187 @@
                 if (targetNode) {
                     targetNode.scrollIntoView({ behavior: 'smooth', block: 'center' });
                 }
+            }
+        }
+
+        function showAllTree() {
+            viewMode = 'all';
+
+            // Update button states
+            document.getElementById('view-all-btn').classList.add('active');
+            document.querySelectorAll('.branch-item').forEach(item => {
+                item.classList.remove('current');
+            });
+
+            // Update header
+            document.getElementById('branch-info').textContent = 'All Branches';
+
+            // Render tree view
+            renderTreeView();
+        }
+
+        function showBranchView(branchName) {
+            // If switching from tree view, re-render timeline first
+            if (viewMode === 'all') {
+                renderTimeline(graphData);
+            }
+            viewMode = 'branch';
+            document.getElementById('view-all-btn').classList.remove('active');
+            filterBranch(branchName);
+        }
+
+        function renderTreeView() {
+            const container = document.getElementById('timeline');
+
+            if (!graphData || !graphData.nodes || graphData.nodes.length === 0) {
+                container.innerHTML = '<div class="empty"><h3>No commits yet</h3></div>';
+                return;
+            }
+
+            // Assign lanes to branches (main = 0, others = 1, 2, ...)
+            const branches = Object.keys(branchesData.branches || {});
+            const branchLane = {};
+            let laneIndex = 0;
+
+            // Main branch first
+            if (branches.includes('main')) {
+                branchLane['main'] = laneIndex++;
+            }
+            // Then other branches
+            branches.filter(b => b !== 'main').sort().forEach(b => {
+                branchLane[b] = laneIndex++;
+            });
+
+            // Build node info: which branch each node belongs to
+            const nodeBranch = {};
+            const nodeDepth = {}; // depth from root
+
+            for (const [branchName, tipCommit] of Object.entries(branchesData.branches || {})) {
+                let current = tipCommit;
+                let depth = 0;
+                const branchNodes = [];
+
+                // Traverse from tip to root
+                while (current) {
+                    branchNodes.push(current);
+                    current = childToParent[current];
+                }
+
+                // Assign depths (root = 0, tip = highest)
+                branchNodes.reverse().forEach((nodeId, idx) => {
+                    // Only set if not already assigned (shared commits belong to parent branch)
+                    if (!nodeBranch[nodeId]) {
+                        nodeBranch[nodeId] = branchName;
+                    }
+                    // Depth is from root
+                    nodeDepth[nodeId] = Math.max(nodeDepth[nodeId] || 0, idx);
+                });
+            }
+
+            // Find max depth for height calculation
+            const maxDepth = Math.max(...Object.values(nodeDepth), 0);
+            const numLanes = Object.keys(branchLane).length || 1;
+
+            // SVG dimensions
+            const laneWidth = 80;
+            const rowHeight = 50;
+            const nodeRadius = 8;
+            const padding = 40;
+            const labelHeight = 30;
+
+            const svgWidth = numLanes * laneWidth + padding * 2;
+            const svgHeight = (maxDepth + 1) * rowHeight + padding * 2 + labelHeight;
+
+            // Calculate node positions
+            const nodePositions = {};
+            graphData.nodes.forEach(node => {
+                const branch = nodeBranch[node.id] || 'main';
+                const lane = branchLane[branch] ?? 0;
+                const depth = nodeDepth[node.id] ?? 0;
+
+                nodePositions[node.id] = {
+                    x: padding + lane * laneWidth + laneWidth / 2,
+                    y: svgHeight - padding - depth * rowHeight - nodeRadius,
+                    lane: lane,
+                    branch: branch,
+                    depth: depth
+                };
+            });
+
+            // Build SVG content
+            let svgContent = '';
+
+            // Lane labels at top
+            for (const [branchName, lane] of Object.entries(branchLane)) {
+                const x = padding + lane * laneWidth + laneWidth / 2;
+                svgContent += `<text class="tree-lane-label" x="${x}" y="${labelHeight - 10}">${branchName}</text>`;
+            }
+
+            // Draw edges first (so they're behind nodes)
+            graphData.edges.forEach(edge => {
+                const fromPos = nodePositions[edge.from];
+                const toPos = nodePositions[edge.to];
+
+                if (!fromPos || !toPos) return;
+
+                // Check if this is a jump edge (crosses lanes)
+                const isJump = fromPos.lane !== toPos.lane;
+                const edgeClass = isJump ? 'tree-edge jump' : 'tree-edge';
+
+                if (fromPos.lane === toPos.lane) {
+                    // Same lane: straight vertical line
+                    svgContent += `<line class="${edgeClass}" x1="${fromPos.x}" y1="${fromPos.y}" x2="${toPos.x}" y2="${toPos.y}"/>`;
+                } else {
+                    // Different lanes: curved path
+                    const midY = (fromPos.y + toPos.y) / 2;
+                    svgContent += `<path class="${edgeClass}" d="M${fromPos.x},${fromPos.y} C${fromPos.x},${midY} ${toPos.x},${midY} ${toPos.x},${toPos.y}"/>`;
+                }
+            });
+
+            // Draw nodes
+            graphData.nodes.forEach(node => {
+                const pos = nodePositions[node.id];
+                if (!pos) return;
+
+                const isHead = node.is_head;
+                const nodeClass = isHead ? 'tree-node head' : 'tree-node';
+
+                svgContent += `
+                    <g class="${nodeClass}" onclick="toggleNodeFromTree('${node.id}')" data-id="${node.id}">
+                        <circle cx="${pos.x}" cy="${pos.y}" r="${nodeRadius}"/>
+                        <text x="${pos.x + nodeRadius + 4}" y="${pos.y + 3}">${node.short_hash}</text>
+                    </g>
+                `;
+            });
+
+            container.innerHTML = `
+                <div class="tree-view">
+                    <svg width="${svgWidth}" height="${svgHeight}" viewBox="0 0 ${svgWidth} ${svgHeight}">
+                        ${svgContent}
+                    </svg>
+                </div>
+            `;
+        }
+
+        function toggleNodeFromTree(nodeId) {
+            // Find the node data
+            const node = graphData.nodes.find(n => n.id === nodeId);
+            if (!node) return;
+
+            // Show a simple popup with node details
+            const details = `
+Commit: ${node.short_hash}
+Branch: ${node.branch || 'unknown'}
+Operation: ${node.operation || 'snap'}
+Time: ${formatTime(node.timestamp)}
+
+Prompt: ${node.prompt || 'No prompt'}
+
+Files: ${(node.files || []).join(', ') || 'None'}
+            `.trim();
+
+            if (confirm(details + '\n\nJump to this commit?')) {
+                jumpTo(nodeId);
             }
         }
 
