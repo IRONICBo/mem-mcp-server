@@ -81,22 +81,6 @@
             letter-spacing: 0.5px;
         }
 
-        .refresh-btn {
-            background: none;
-            border: none;
-            font-size: 14px;
-            color: #999;
-            cursor: pointer;
-            padding: 2px 6px;
-            border-radius: 4px;
-            transition: all 0.15s;
-        }
-
-        .refresh-btn:hover {
-            background: #f0f0f0;
-            color: #333;
-        }
-
         .branch-item {
             padding: 6px 10px;
             margin-bottom: 2px;
@@ -550,7 +534,6 @@
         <div class="sidebar">
             <div class="sidebar-header">
                 <h2>Branches</h2>
-                <button class="refresh-btn" onclick="refreshData()" title="Refresh">↻</button>
             </div>
             <button class="view-all-btn" id="view-all-btn" onclick="showAllTree()">ALL</button>
             <div id="branches-list">
@@ -580,8 +563,44 @@
         let graphData = null;
         let branchesData = null;
         let childToParent = {};
+        let nodeBranch = {}; // Maps commit hash to the branch it belongs to
         let expandedNode = null;
         let viewMode = 'branch'; // 'branch' | 'all'
+
+        // Build nodeBranch mapping: determine which branch each commit belongs to
+        // Shared commits belong to the "parent" branch (main first, then alphabetically)
+        function buildNodeBranchMapping() {
+            nodeBranch = {};
+            if (!branchesData?.branches) return;
+
+            const branches = Object.keys(branchesData.branches);
+            // Process main first, then others alphabetically
+            const orderedBranches = [];
+            if (branches.includes('main')) {
+                orderedBranches.push('main');
+            }
+            branches.filter(b => b !== 'main').sort().forEach(b => orderedBranches.push(b));
+
+            for (const branchName of orderedBranches) {
+                const tipCommit = branchesData.branches[branchName];
+                let current = tipCommit;
+                const branchNodes = [];
+
+                // Traverse from tip to root
+                while (current) {
+                    branchNodes.push(current);
+                    current = childToParent[current];
+                }
+
+                // Assign branch ownership (root to tip order)
+                // Only set if not already assigned (shared commits belong to parent branch)
+                branchNodes.reverse().forEach(nodeId => {
+                    if (!nodeBranch[nodeId]) {
+                        nodeBranch[nodeId] = branchName;
+                    }
+                });
+            }
+        }
 
         // Fetch and render data
         async function init() {
@@ -627,6 +646,9 @@
                     });
                 }
 
+                // Build nodeBranch mapping (which branch each commit belongs to)
+                buildNodeBranchMapping();
+
                 renderBranches(branches);
 
                 // Default to ALL tree view
@@ -638,41 +660,6 @@
             }
         }
 
-        async function refreshData() {
-            // Refresh graph and branches data from server
-            try {
-                const [branchesRes, graphRes] = await Promise.all([
-                    fetch('/api/branches'),
-                    fetch('/api/graph')
-                ]);
-
-                const branches = await branchesRes.json();
-                graphData = await graphRes.json();
-                branchesData = branches;
-
-                // Rebuild childToParent mapping
-                childToParent = {};
-                if (graphData.edges) {
-                    graphData.edges.forEach(e => {
-                        if (!childToParent[e.to]) {
-                            childToParent[e.to] = e.from;
-                        }
-                    });
-                }
-
-                renderBranches(branches);
-
-                // Re-render current view
-                if (viewMode === 'all') {
-                    renderTreeView();
-                } else {
-                    renderTimeline(graphData);
-                }
-            } catch (error) {
-                console.error('Failed to refresh data:', error);
-            }
-        }
-
         function renderBranches(branches) {
             const container = document.getElementById('branches-list');
             if (!branches.branches || Object.keys(branches.branches).length === 0) {
@@ -680,16 +667,16 @@
                 return;
             }
 
-            // Count commits per branch using graph traversal
+            // Count commits per branch using nodeBranch mapping
             const branchCommitCounts = {};
-            for (const [name, tipCommit] of Object.entries(branches.branches)) {
-                let count = 0;
-                let current = tipCommit;
-                while (current) {
-                    count++;
-                    current = childToParent[current];
+            for (const name of Object.keys(branches.branches)) {
+                branchCommitCounts[name] = 0;
+            }
+            // Count how many nodes belong to each branch
+            for (const [nodeId, branchName] of Object.entries(nodeBranch)) {
+                if (branchCommitCounts.hasOwnProperty(branchName)) {
+                    branchCommitCounts[branchName]++;
                 }
-                branchCommitCounts[name] = count;
             }
 
             container.innerHTML = Object.entries(branches.branches)
@@ -856,25 +843,14 @@
             // Update header info
             document.getElementById('branch-info').textContent = `Current: ${branchName}`;
 
-            // Get the tip commit of this branch
+            // Get the tip commit of this branch (for scrolling)
             const tipCommit = branchesData?.branches?.[branchName];
-            if (!tipCommit) {
-                return;
-            }
 
-            // Traverse from tip to root, collecting all commits in this branch
-            const branchCommits = new Set();
-            let current = tipCommit;
-            while (current) {
-                branchCommits.add(current);
-                current = childToParent[current];
-            }
-
-            // Show only commits belonging to this branch
+            // Show only commits belonging to this branch (using nodeBranch mapping)
             const nodes = document.querySelectorAll('.node');
             nodes.forEach(node => {
                 const nodeId = node.dataset.id;
-                if (branchCommits.has(nodeId)) {
+                if (nodeBranch[nodeId] === branchName) {
                     node.style.display = '';
                 } else {
                     node.style.display = 'none';
@@ -882,7 +858,7 @@
             });
 
             // Scroll to the tip commit (most recent in this branch)
-            if (!skipScroll) {
+            if (!skipScroll && tipCommit) {
                 const targetNode = document.querySelector(`.node[data-id="${tipCommit}"]`);
                 if (targetNode) {
                     targetNode.scrollIntoView({ behavior: 'smooth', block: 'center' });
