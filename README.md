@@ -15,7 +15,7 @@
 </div>
 
 MemoV as VibeGit = Prompt + Agent Plan + CodeDiff, all under version control.
-VibeGit: A shadow `.mem` timeline alongside git — every interaction (prompt, plan, diff) captured before you commit.
+A local, zero-friction memory layer for AI coding — every prompt, agent decision, and code diff versioned automatically, without touching Git.
 
 <p align="center">
   <img src="docs/images/readme.gif" alt="MemoV Demo" width="800px">
@@ -33,10 +33,12 @@ VibeGit: A shadow `.mem` timeline alongside git — every interaction (prompt, p
 
 ## Features
 
-- 📒 **ContextGit memory**: Automatically track code diffs, prompts, and agent plans — independent of .git.
-- ⏪ **Fine-grained rollback**: Built on git, revert to a specific agent plan within a single commit
-- 🤝 **Team context sharing**: Real-time alignment with zero friction
-- ♻️ **Change reuse**: Reapply past code edits by description to save tokens when iterating on a feature
+- ⚡ **Zero-friction** — One command to install. No workflow changes.
+- 🧠 **Full context capture** — Prompts, plans, diffs stored as-is. Git stores results, VibeGit stores reasoning.
+- ⏪ **Time-travel** — Jump, branch, rewind to any point. Track how you explored, not just what you shipped.
+- 🔍 **Visual UI** — Search and navigate your AI coding history locally.
+- 🔒 **Privacy-first** — Fully local. No cloud, no training, no leakage.
+- 🧼 **Git untouched** — Shadow `.mem` timeline. No polluted commits.
 
 ## Quick Start (MCP Installation)
 
@@ -102,6 +104,14 @@ Go to **Files > Preferences > Cursor Settings > MCP**, then add:
   }
 }
 ```
+
+### Web UI
+
+```bash
+mem web --loc /path/to/project
+```
+
+Opens at `http://localhost:38888` with timeline view, branch filtering, diff viewer, and jump to any snapshot.
 
 ### With VectorDB (RAG mode)
 
@@ -214,34 +224,6 @@ mem --help
 ```
 
 </details>
-
-## Web UI
-
-MemoV includes a visual timeline browser for exploring your commit history.
-
-### Installation
-
-```bash
-# From source
-uv pip install -e ".[web]"
-
-# Or with uvx
-uvx --from "git+https://github.com/memovai/memov.git[web]" mem web
-```
-
-### Usage
-
-```bash
-mem web --loc /path/to/project
-```
-
-Opens a web interface at `http://localhost:38888` with:
-
-- **Timeline View**: Visual commit history with expandable cards showing prompts, plans, and file changes
-- **Branch Filtering**: Click branches in sidebar to filter commits and auto-scroll to branch tip
-- **Skeleton Mode**: Toggle compact view showing only dots and lines for quick navigation
-- **Diff Viewer**: Click "View Diff" to see code changes for any commit
-- **Jump**: Restore project state to any previous snapshot
 
 ## Installation for Contributors
 
