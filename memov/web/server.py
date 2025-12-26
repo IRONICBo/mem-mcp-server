@@ -168,7 +168,7 @@ def create_app(project_path: str) -> "FastAPI":
 
         return {"status": "success", "new_branch": new_branch}
 
-    # Serve static files (index.html)
+    # Serve static files
     static_dir = Path(__file__).parent / "static"
     if static_dir.exists():
 
@@ -179,6 +179,9 @@ def create_app(project_path: str) -> "FastAPI":
             if index_path.exists():
                 return HTMLResponse(content=index_path.read_text(), status_code=200)
             raise HTTPException(status_code=404, detail="index.html not found")
+
+        # Mount static files for assets (logo, etc.)
+        app.mount("/static", StaticFiles(directory=str(static_dir)), name="static")
 
     return app
 

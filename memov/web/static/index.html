@@ -28,6 +28,18 @@
             border-bottom: 1px solid #e5e5e5;
         }
 
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .header-logo {
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
+        }
+
         .header h1 {
             font-size: 18px;
             font-weight: 600;
@@ -54,12 +66,35 @@
             overflow-y: auto;
         }
 
+        .sidebar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
         .sidebar h2 {
             font-size: 11px;
             color: #999;
-            margin-bottom: 12px;
+            margin-bottom: 0;
             text-transform: uppercase;
             letter-spacing: 0.5px;
+        }
+
+        .refresh-btn {
+            background: none;
+            border: none;
+            font-size: 14px;
+            color: #999;
+            cursor: pointer;
+            padding: 2px 6px;
+            border-radius: 4px;
+            transition: all 0.15s;
+        }
+
+        .refresh-btn:hover {
+            background: #f0f0f0;
+            color: #333;
         }
 
         .branch-item {
@@ -504,13 +539,19 @@
 </head>
 <body>
     <div class="header">
-        <h1>MemoV Timeline</h1>
+        <div class="header-left">
+            <img src="/static/memov.jpg" alt="MemoV" class="header-logo">
+            <h1>MemoV Timeline</h1>
+        </div>
         <div class="header-info" id="branch-info">Loading...</div>
     </div>
 
     <div class="container">
         <div class="sidebar">
-            <h2>Branches</h2>
+            <div class="sidebar-header">
+                <h2>Branches</h2>
+                <button class="refresh-btn" onclick="refreshData()" title="Refresh">↻</button>
+            </div>
             <button class="view-all-btn" id="view-all-btn" onclick="showAllTree()">ALL</button>
             <div id="branches-list">
                 <div class="loading">Loading...</div>
@@ -588,8 +629,8 @@
 
                 renderBranches(branches);
 
-                // Default to ALL tree view (skip refresh since we just loaded)
-                showAllTree(true);
+                // Default to ALL tree view
+                showAllTree();
             } catch (error) {
                 console.error('Failed to load data:', error);
                 document.getElementById('timeline').innerHTML =
@@ -620,6 +661,13 @@
                 }
 
                 renderBranches(branches);
+
+                // Re-render current view
+                if (viewMode === 'all') {
+                    renderTreeView();
+                } else {
+                    renderTimeline(graphData);
+                }
             } catch (error) {
                 console.error('Failed to refresh data:', error);
             }
@@ -842,12 +890,7 @@
             }
         }
 
-        async function showAllTree(skipRefresh = false) {
-            // Refresh data before switching view (unless initial load)
-            if (!skipRefresh) {
-                await refreshData();
-            }
-
+        function showAllTree() {
             viewMode = 'all';
 
             // Update button states
@@ -863,10 +906,7 @@
             renderTreeView();
         }
 
-        async function showBranchView(branchName) {
-            // Refresh data before switching view
-            await refreshData();
-
+        function showBranchView(branchName) {
             // If switching from tree view, re-render timeline first
             if (viewMode === 'all') {
                 renderTimeline(graphData);
