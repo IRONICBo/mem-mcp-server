@@ -494,8 +494,12 @@
                 renderBranches(branches);
                 renderTimeline(graphData);
 
-                document.getElementById('branch-info').textContent =
-                    `Current: ${branches.current || 'detached'}`;
+                // Highlight current branch's commits on initial load (skip scroll)
+                if (branches.current) {
+                    filterBranch(branches.current, true);
+                } else {
+                    document.getElementById('branch-info').textContent = 'detached';
+                }
             } catch (error) {
                 console.error('Failed to load data:', error);
                 document.getElementById('timeline').innerHTML =
@@ -670,7 +674,7 @@
             }
         }
 
-        function filterBranch(branchName) {
+        function filterBranch(branchName, skipScroll = false) {
             // Update sidebar highlight
             const branchItems = document.querySelectorAll('.branch-item');
             branchItems.forEach(item => {
@@ -695,10 +699,8 @@
             // Traverse from tip to root, collecting all commits in this branch
             const branchCommits = new Set();
             let current = tipCommit;
-            let firstCommit = tipCommit;  // Track the earliest commit
             while (current) {
                 branchCommits.add(current);
-                firstCommit = current;  // Keep updating to get the root
                 current = childToParent[current];
             }
 
@@ -714,9 +716,11 @@
             });
 
             // Scroll to the tip commit (most recent in this branch)
-            const targetNode = document.querySelector(`.node[data-id="${tipCommit}"]`);
-            if (targetNode) {
-                targetNode.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            if (!skipScroll) {
+                const targetNode = document.querySelector(`.node[data-id="${tipCommit}"]`);
+                if (targetNode) {
+                    targetNode.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
             }
         }
 
