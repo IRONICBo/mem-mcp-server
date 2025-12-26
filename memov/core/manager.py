@@ -420,7 +420,7 @@ class MemovManager:
                 commit_hash = GitManager.create_commit_from_tree_structure(
                     self.bare_repo_path,
                     tree_structure,
-                    f"Create snapshot\n\nFiles: {', '.join(sorted(tracked_specified))}\nPrompt: {prompt}\nResponse: {response}\nSource: {'User' if by_user else 'AI'}",
+                    f"Create snapshot\n\nFiles: {', '.join(sorted(tracked_specified))}\nPrompt: {prompt}\nResponse: {response}\nAgent Plan: {agent_plan}\nSource: {'User' if by_user else 'AI'}",
                 )
 
                 if not commit_hash:
@@ -464,9 +464,7 @@ class MemovManager:
                     commit_file_paths[rel_path] = abs_path
 
                 commit_msg = "Create snapshot\n\n"
-                commit_msg += (
-                    f"Prompt: {prompt}\nResponse: {response}\nSource: {'User' if by_user else 'AI'}"
-                )
+                commit_msg += f"Prompt: {prompt}\nResponse: {response}\nAgent Plan: {agent_plan}\nSource: {'User' if by_user else 'AI'}"
 
             commit_hash = self._commit(commit_msg, commit_file_paths)
             LOGGER.info("Snapshot created in memov repo.")
@@ -666,9 +664,9 @@ class MemovManager:
 
             # Print the header with new format including Operation column
             logging.info(
-                f"{'Operation'.ljust(10)} {'Branch'.ljust(20)} {'Commit'.ljust(8)} {'Prompt'.ljust(15)} {'Resp'.ljust(15)}"
+                f"{'Operation'.ljust(10)} {'Branch'.ljust(20)} {'Commit'.ljust(8)} {'Prompt'.ljust(15)} {'Resp'.ljust(15)} {'Plan'.ljust(15)}"
             )
-            logging.info("-" * 70)
+            logging.info("-" * 85)
 
             # Get commit history for each branch and print the details
             seen = set()
@@ -684,23 +682,27 @@ class MemovManager:
                     message = GitManager.get_commit_message(self.bare_repo_path, hash_id)
                     operation_type = self._extract_operation_type(message)
 
-                    # Get prompt and response from commit message first
-                    prompt = response = ""
+                    # Get prompt, response, agent_plan from commit message first
+                    prompt = response = agent_plan = ""
                     for line in message.splitlines():
                         if line.startswith("Prompt:"):
                             prompt = line[len("Prompt:") :].strip()
                         elif line.startswith("Response:"):
                             response = line[len("Response:") :].strip()
+                        elif line.startswith("Agent Plan:"):
+                            agent_plan = line[len("Agent Plan:") :].strip()
 
                     # Check if there's a git note for this commit (priority over commit message)
                     note_content = GitManager.get_commit_note(self.bare_repo_path, hash_id)
                     if note_content:
-                        # Parse the note content for updated prompt/response
+                        # Parse the note content for updated prompt/response/agent_plan
                         for line in note_content.splitlines():
                             if line.startswith("Prompt:"):
                                 prompt = line[len("Prompt:") :].strip()
                             elif line.startswith("Response:"):
                                 response = line[len("Response:") :].strip()
+                            elif line.startswith("Agent Plan:"):
+                                agent_plan = line[len("Agent Plan:") :].strip()
 
                     # Get the branch marker and format the output
                     marker = "*" if hash_id == head_commit else " "
@@ -708,23 +710,27 @@ class MemovManager:
                     branch_str = f"[{branch_names}]" if branch_names else ""
                     hash7 = hash_id[:7]
 
-                    # Format prompt and response, handle None values
+                    # Format prompt, response, agent_plan, handle None values
                     prompt_display = short_msg(prompt) if prompt and prompt != "None" else "None"
                     response_display = (
                         short_msg(response) if response and response != "None" else "None"
                     )
+                    plan_display = (
+                        short_msg(agent_plan) if agent_plan and agent_plan != "None" else "None"
+                    )
 
                     logging.info(
-                        f"{operation_type.ljust(10)} {marker} {branch_str.ljust(18)} {hash7.ljust(8)} {prompt_display.ljust(15)} {response_display.ljust(15)}"
+                        f"{operation_type.ljust(10)} {marker} {branch_str.ljust(18)} {hash7.ljust(8)} {prompt_display.ljust(15)} {response_display.ljust(15)} {plan_display.ljust(15)}"
                     )
         except Exception as e:
             LOGGER.error(f"Error showing history in memov repo: {e}")
 
-    def get_history(self, limit: int = 20) -> list[dict]:
+    def get_history(self, limit: int = 20, include_diff: bool = True) -> list[dict]:
         """Get the history of all branches in the memov bare repo as structured data.
 
         Args:
             limit: Maximum number of commits to return (default: 20)
+            include_diff: Whether to include diff/hunk information for each commit (default: True)
 
         Returns:
             List of commit dictionaries with keys:
@@ -739,6 +745,7 @@ class MemovManager:
                 - files: List of files in the commit
                 - timestamp: Commit timestamp (ISO format)
                 - author: Commit author
+                - diff: Dict mapping file paths to their diff/hunk content (if include_diff=True)
         """
         result = []
         try:
@@ -801,23 +808,29 @@ class MemovManager:
                 # Get commit details (timestamp, author) using git log
                 commit_info = self._get_commit_info(hash_id)
 
+                # Get diff/hunk information if requested
+                diff_data = {}
+                if include_diff:
+                    diff_data = self._get_commit_diff_by_file(hash_id)
+
                 # Build result entry
                 branch_names = commit_to_branch.get(hash_id, [])
-                result.append(
-                    {
-                        "commit_hash": hash_id,
-                        "short_hash": hash_id[:7],
-                        "operation": operation_type,
-                        "branch": ",".join(branch_names) if branch_names else None,
-                        "is_head": hash_id == head_commit,
-                        "prompt": prompt if prompt and prompt != "None" else None,
-                        "response": response if response and response != "None" else None,
-                        "agent_plan": agent_plan if agent_plan and agent_plan != "None" else None,
-                        "files": file_rel_paths,
-                        "timestamp": commit_info.get("timestamp"),
-                        "author": commit_info.get("author"),
-                    }
-                )
+                entry = {
+                    "commit_hash": hash_id,
+                    "short_hash": hash_id[:7],
+                    "operation": operation_type,
+                    "branch": ",".join(branch_names) if branch_names else None,
+                    "is_head": hash_id == head_commit,
+                    "prompt": prompt if prompt and prompt != "None" else None,
+                    "response": response if response and response != "None" else None,
+                    "agent_plan": agent_plan if agent_plan and agent_plan != "None" else None,
+                    "files": file_rel_paths,
+                    "timestamp": commit_info.get("timestamp"),
+                    "author": commit_info.get("author"),
+                }
+                if include_diff:
+                    entry["diff"] = diff_data
+                result.append(entry)
 
         except Exception as e:
             LOGGER.error(f"Error getting history from memov repo: {e}")
@@ -844,6 +857,208 @@ class MemovManager:
                 return {"timestamp": parts[0], "author": parts[1]}
 
         return {"timestamp": None, "author": None}
+
+    def _get_commit_diff_by_file(self, commit_hash: str) -> dict[str, dict]:
+        """Get structured diff content for a specific commit, grouped by file.
+
+        Args:
+            commit_hash: The commit hash to get diff for.
+
+        Returns:
+            Dictionary mapping file paths to structured diff data.
+            Example: {
+                "1.txt": {
+                    "status": "modified",  # "added", "modified", "deleted"
+                    "hunks": [
+                        {
+                            "header": "@@ -0,0 +1 @@",
+                            "old_start": 0,
+                            "old_count": 0,
+                            "new_start": 1,
+                            "new_count": 1,
+                            "lines": [
+                                {"type": "add", "content": "hello!!!!"}
+                            ]
+                        }
+                    ]
+                }
+            }
+        """
+        import re
+
+        from memov.core.git import subprocess_call
+
+        try:
+            # Resolve the full commit hash
+            full_hash = GitManager.get_commit_id_by_ref(
+                self.bare_repo_path, commit_hash, verbose=False
+            )
+            if not full_hash:
+                LOGGER.error(f"Commit '{commit_hash}' not found.")
+                return {}
+
+            # Get the parent commit (if exists)
+            command = [
+                "git",
+                f"--git-dir={self.bare_repo_path}",
+                "rev-parse",
+                f"{full_hash}^",
+            ]
+            success, output = subprocess_call(command=command)
+
+            diffs_by_file: dict[str, dict] = {}
+
+            if success and output.stdout.strip():
+                # Has parent - get diff between parent and this commit
+                parent_hash = output.stdout.strip()
+                diff_command = [
+                    "git",
+                    f"--git-dir={self.bare_repo_path}",
+                    "diff",
+                    parent_hash,
+                    full_hash,
+                ]
+                success, diff_output = subprocess_call(command=diff_command)
+                if success and diff_output.stdout:
+                    # Parse the diff output and group by file
+                    diffs_by_file = self._parse_diff_by_file(diff_output.stdout)
+            else:
+                # No parent (first commit) - show all files as added
+                file_rel_paths, _ = GitManager.get_files_by_commit(self.bare_repo_path, full_hash)
+                for rel_path in file_rel_paths:
+                    # Get file content from the commit
+                    show_command = [
+                        "git",
+                        f"--git-dir={self.bare_repo_path}",
+                        "show",
+                        f"{full_hash}:{rel_path}",
+                    ]
+                    success, content_output = subprocess_call(command=show_command)
+                    if success:
+                        lines = content_output.stdout.splitlines()
+                        line_count = len(lines)
+                        diffs_by_file[rel_path] = {
+                            "status": "added",
+                            "hunks": [
+                                {
+                                    "header": f"@@ -0,0 +1,{line_count} @@",
+                                    "old_start": 0,
+                                    "old_count": 0,
+                                    "new_start": 1,
+                                    "new_count": line_count,
+                                    "lines": [{"type": "add", "content": line} for line in lines],
+                                }
+                            ],
+                        }
+
+            return diffs_by_file
+
+        except Exception as e:
+            LOGGER.error(f"Error getting diff for commit {commit_hash}: {e}")
+            return {}
+
+    def _parse_diff_by_file(self, diff_output: str) -> dict[str, dict]:
+        """Parse unified diff output and return structured data grouped by file.
+
+        Args:
+            diff_output: Raw git diff output string.
+
+        Returns:
+            Dictionary mapping file paths to structured diff data with hunks.
+        """
+        import re
+
+        diffs_by_file: dict[str, dict] = {}
+        current_file = None
+        current_status = "modified"
+        current_hunks: list[dict] = []
+        current_hunk: Optional[dict] = None
+
+        # Regex to parse hunk header: @@ -old_start,old_count +new_start,new_count @@
+        hunk_pattern = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@")
+
+        for line in diff_output.splitlines():
+            # Detect start of a new file diff
+            if line.startswith("diff --git"):
+                # Save previous file's data if exists
+                if current_file:
+                    if current_hunk:
+                        current_hunks.append(current_hunk)
+                    diffs_by_file[current_file] = {
+                        "status": current_status,
+                        "hunks": current_hunks,
+                    }
+
+                # Extract file path from "diff --git a/path b/path"
+                parts = line.split(" ")
+                if len(parts) >= 4:
+                    b_path = parts[-1]
+                    if b_path.startswith("b/"):
+                        current_file = b_path[2:]
+                    else:
+                        current_file = b_path
+                else:
+                    current_file = None
+
+                current_status = "modified"
+                current_hunks = []
+                current_hunk = None
+
+            elif line.startswith("new file mode"):
+                current_status = "added"
+            elif line.startswith("deleted file mode"):
+                current_status = "deleted"
+            elif line.startswith("@@"):
+                # Save previous hunk if exists
+                if current_hunk:
+                    current_hunks.append(current_hunk)
+
+                # Parse hunk header
+                match = hunk_pattern.match(line)
+                if match:
+                    old_start = int(match.group(1))
+                    old_count = int(match.group(2)) if match.group(2) else 1
+                    new_start = int(match.group(3))
+                    new_count = int(match.group(4)) if match.group(4) else 1
+                    current_hunk = {
+                        "header": line,
+                        "old_start": old_start,
+                        "old_count": old_count,
+                        "new_start": new_start,
+                        "new_count": new_count,
+                        "lines": [],
+                    }
+                else:
+                    current_hunk = {
+                        "header": line,
+                        "old_start": 0,
+                        "old_count": 0,
+                        "new_start": 0,
+                        "new_count": 0,
+                        "lines": [],
+                    }
+            elif current_hunk is not None:
+                # Parse diff lines
+                if line.startswith("+"):
+                    current_hunk["lines"].append({"type": "add", "content": line[1:]})
+                elif line.startswith("-"):
+                    current_hunk["lines"].append({"type": "delete", "content": line[1:]})
+                elif line.startswith(" "):
+                    current_hunk["lines"].append({"type": "context", "content": line[1:]})
+                elif line.startswith("\\"):
+                    # "\ No newline at end of file"
+                    current_hunk["lines"].append({"type": "info", "content": line})
+
+        # Don't forget the last file
+        if current_file:
+            if current_hunk:
+                current_hunks.append(current_hunk)
+            diffs_by_file[current_file] = {
+                "status": current_status,
+                "hunks": current_hunks,
+            }
+
+        return diffs_by_file
 
     def jump(self, commit_hash: str) -> tuple[MemStatus, str]:
         """Jump to a specific snapshot and auto-create a new branch.
@@ -896,11 +1111,35 @@ class MemovManager:
                 tar.extractall(self.project_path)
 
             # Auto-create a new branch at this commit
+            # Record where we jumped from (the previous HEAD)
+            previous_branch = branches.get("current", "main")
+            previous_head = branches["branches"].get(previous_branch)
+
             new_branch = self._generate_jump_branch_name(branches)
             branches["branches"][new_branch] = full_hash
             branches["current"] = new_branch
+
+            # Record jump metadata: from which commit we jumped
+            if "jump_from" not in branches:
+                branches["jump_from"] = {}
+            if previous_head and previous_head != full_hash:
+                branches["jump_from"][new_branch] = {
+                    "from_commit": previous_head,
+                    "to_commit": full_hash,
+                    "from_branch": previous_branch,
+                }
+
             self._save_branches(branches)
             GitManager.update_ref(self.bare_repo_path, "refs/memov/HEAD", full_hash)
+
+            # Record jump in exploration history (jump.json)
+            if previous_head and previous_head != full_hash:
+                self._record_jump(
+                    from_commit=previous_head,
+                    to_commit=full_hash,
+                    from_branch=previous_branch,
+                    new_branch=new_branch,
+                )
 
             LOGGER.info(f"Jumped to commit {full_hash[:7]} and created branch '{new_branch}'.")
             return MemStatus.SUCCESS, new_branch
@@ -932,6 +1171,74 @@ class MemovManager:
 
         except Exception as e:
             LOGGER.error(f"Error showing snapshot {commit_id} in bare repo: {e}")
+
+    def get_diff(self, commit_hash: str) -> dict[str, str]:
+        """Get diff content for a specific commit.
+
+        Args:
+            commit_hash: The commit hash to get diff for.
+
+        Returns:
+            Dictionary mapping file paths to their diff content.
+        """
+        try:
+            from memov.core.git import subprocess_call
+
+            # Resolve the full commit hash
+            full_hash = GitManager.get_commit_id_by_ref(
+                self.bare_repo_path, commit_hash, verbose=False
+            )
+            if not full_hash:
+                LOGGER.error(f"Commit '{commit_hash}' not found.")
+                return {}
+
+            # Get the parent commit (if exists)
+            command = [
+                "git",
+                f"--git-dir={self.bare_repo_path}",
+                "rev-parse",
+                f"{full_hash}^",
+            ]
+            success, output = subprocess_call(command=command)
+
+            diffs = {}
+
+            if success and output.stdout.strip():
+                # Has parent - get diff between parent and this commit
+                parent_hash = output.stdout.strip()
+                diff_command = [
+                    "git",
+                    f"--git-dir={self.bare_repo_path}",
+                    "diff",
+                    parent_hash,
+                    full_hash,
+                ]
+                success, diff_output = subprocess_call(command=diff_command)
+                if success:
+                    diffs["_all"] = diff_output.stdout
+            else:
+                # No parent (first commit) - show all files as added
+                file_rel_paths, _ = GitManager.get_files_by_commit(self.bare_repo_path, full_hash)
+                for rel_path in file_rel_paths:
+                    # Get file content from the commit
+                    show_command = [
+                        "git",
+                        f"--git-dir={self.bare_repo_path}",
+                        "show",
+                        f"{full_hash}:{rel_path}",
+                    ]
+                    success, content_output = subprocess_call(command=show_command)
+                    if success:
+                        # Format as diff-like output
+                        lines = content_output.stdout.splitlines()
+                        diff_lines = [f"+{line}" for line in lines]
+                        diffs[rel_path] = "\n".join(diff_lines)
+
+            return diffs
+
+        except Exception as e:
+            LOGGER.error(f"Error getting diff for commit {commit_hash}: {e}")
+            return {}
 
     def status(self) -> tuple[MemStatus, dict[str, list[Path]]]:
         """Show status of working directory compared to HEAD snapshot, and display current HEAD commit and branch."""
@@ -1148,6 +1455,42 @@ class MemovManager:
         """Save branches configuration to the branches config file."""
         with open(self.branches_config_path, "w") as f:
             json.dump(data, f, indent=2)
+
+    def _load_jump_history(self) -> dict:
+        """Load exploration history from jump.json."""
+        jump_file = Path(self.mem_root_path) / "jump.json"
+        if not jump_file.exists():
+            return {"history": []}
+        try:
+            with open(jump_file, "r") as f:
+                return json.load(f)
+        except (json.JSONDecodeError, IOError):
+            return {"history": []}
+
+    def _save_jump_history(self, data: dict) -> None:
+        """Save exploration history to jump.json."""
+        jump_file = Path(self.mem_root_path) / "jump.json"
+        with open(jump_file, "w") as f:
+            json.dump(data, f, indent=2)
+
+    def _record_jump(
+        self, from_commit: str, to_commit: str, from_branch: str, new_branch: str
+    ) -> None:
+        """Record a jump action in exploration history."""
+        data = self._load_jump_history()
+        next_id = max([h["id"] for h in data["history"]], default=0) + 1
+        data["history"].append(
+            {
+                "id": next_id,
+                "timestamp": datetime.now().isoformat(),
+                "action": "jump",
+                "from_commit": from_commit,
+                "to_commit": to_commit,
+                "from_branch": from_branch,
+                "new_branch": new_branch,
+            }
+        )
+        self._save_jump_history(data)
 
     def _next_develop_branch(self, branches: dict[str, str]) -> str:
         """Find the next available develop branch name based on existing branches."""

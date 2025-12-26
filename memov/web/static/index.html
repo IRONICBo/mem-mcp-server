@@ -1,0 +1,1265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MemoV Timeline</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: #fafafa;
+            color: #333;
+            min-height: 100vh;
+        }
+
+        /* Header */
+        .header {
+            background: #fff;
+            padding: 16px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #e5e5e5;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .header-logo {
+            width: 32px;
+            height: 32px;
+            border-radius: 6px;
+        }
+
+        .header h1 {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .header-info {
+            color: #888;
+            font-size: 13px;
+        }
+
+        /* Main container */
+        .container {
+            display: flex;
+            height: calc(100vh - 56px);
+        }
+
+        /* Sidebar */
+        .sidebar {
+            width: 180px;
+            background: #fff;
+            border-right: 1px solid #e5e5e5;
+            padding: 16px;
+            overflow-y: auto;
+        }
+
+        .sidebar-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .sidebar h2 {
+            font-size: 11px;
+            color: #999;
+            margin-bottom: 0;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .branch-item {
+            padding: 6px 10px;
+            margin-bottom: 2px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            color: #555;
+        }
+
+        .branch-item:hover {
+            background: #f0f0f0;
+        }
+
+        .branch-item.current {
+            background: #333;
+            color: white;
+        }
+
+        .branch-item .count {
+            float: right;
+            color: #aaa;
+            font-size: 11px;
+        }
+
+        .branch-item.current .count {
+            color: #ccc;
+        }
+
+        .branch-item.active {
+            border: 1.5px solid #333;
+        }
+
+        /* Timeline */
+        .timeline {
+            flex: 1;
+            overflow-y: auto;
+            padding: 24px;
+        }
+
+        .timeline-container {
+            position: relative;
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        /* Node */
+        .node {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 16px;
+            position: relative;
+        }
+
+        .node-line {
+            position: absolute;
+            left: 9px;
+            top: 20px;
+            bottom: -16px;
+            width: 2px;
+            background: #ddd;
+        }
+
+        .node:last-child .node-line {
+            display: none;
+        }
+
+        .node-dot {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #fff;
+            border: 2px solid #999;
+            flex-shrink: 0;
+            z-index: 1;
+            cursor: pointer;
+            transition: transform 0.15s;
+        }
+
+        .node-dot:hover {
+            transform: scale(1.15);
+            border-color: #333;
+        }
+
+        .node-dot.head {
+            background: #333;
+            border-color: #333;
+        }
+
+        /* Node card */
+        .node-card {
+            margin-left: 12px;
+            background: #fff;
+            border: 1px solid #e5e5e5;
+            border-radius: 6px;
+            padding: 12px 16px;
+            flex: 1;
+            max-width: 700px;
+            cursor: pointer;
+            transition: border-color 0.15s, box-shadow 0.15s;
+        }
+
+        .node-card:hover {
+            border-color: #ccc;
+        }
+
+        .node-card.expanded {
+            border-color: #333;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        }
+
+        .node-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 6px;
+        }
+
+        .node-hash {
+            font-family: 'SF Mono', Consolas, monospace;
+            background: #f5f5f5;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 12px;
+            color: #666;
+        }
+
+        .node-operation {
+            font-size: 11px;
+            color: #999;
+            text-transform: uppercase;
+        }
+
+        .node-branch {
+            font-size: 11px;
+            background: #e8f5e9;
+            color: #2e7d32;
+            padding: 2px 8px;
+            border-radius: 10px;
+        }
+
+        .node-time {
+            font-size: 11px;
+            color: #aaa;
+            margin-left: auto;
+        }
+
+        .node-prompt {
+            color: #444;
+            font-size: 13px;
+            margin-bottom: 6px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .node-files {
+            display: flex;
+            gap: 4px;
+            flex-wrap: wrap;
+        }
+
+        .node-file {
+            font-size: 10px;
+            padding: 1px 6px;
+            border-radius: 10px;
+        }
+
+        .node-file.added {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .node-file.modified {
+            background: #fff3e0;
+            color: #e65100;
+        }
+
+        .node-file.deleted {
+            background: #ffebee;
+            color: #c62828;
+        }
+
+        .node-file.unchanged {
+            background: #f5f5f5;
+            color: #777;
+        }
+
+        .node-file.more {
+            background: #f0f0f0;
+            color: #999;
+        }
+
+        /* Expanded details */
+        .node-details {
+            display: none;
+            margin-top: 12px;
+            padding-top: 12px;
+            border-top: 1px solid #eee;
+        }
+
+        .node-card.expanded .node-details {
+            display: block;
+        }
+
+        .detail-section {
+            margin-bottom: 12px;
+        }
+
+        .detail-section h4 {
+            color: #666;
+            font-size: 11px;
+            text-transform: uppercase;
+            margin-bottom: 6px;
+            letter-spacing: 0.3px;
+        }
+
+        .detail-section p {
+            color: #444;
+            font-size: 13px;
+            line-height: 1.5;
+            white-space: pre-wrap;
+        }
+
+        .detail-files {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .detail-file {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-family: 'SF Mono', Consolas, monospace;
+            font-size: 11px;
+            cursor: pointer;
+            transition: opacity 0.15s;
+        }
+
+        .detail-file:hover {
+            opacity: 0.8;
+        }
+
+        .detail-file.added {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .detail-file.modified {
+            background: #fff3e0;
+            color: #e65100;
+        }
+
+        .detail-file.deleted {
+            background: #ffebee;
+            color: #c62828;
+            text-decoration: line-through;
+        }
+
+        .detail-file.unchanged {
+            background: #f5f5f5;
+            color: #757575;
+        }
+
+        .detail-file .status-icon {
+            font-weight: bold;
+            font-size: 10px;
+        }
+
+        .btn {
+            padding: 6px 12px;
+            background: #333;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            margin-top: 8px;
+        }
+
+        .btn:hover {
+            background: #444;
+        }
+
+        .btn-secondary {
+            background: #f5f5f5;
+            color: #333;
+            border: 1px solid #ddd;
+        }
+
+        .btn-secondary:hover {
+            background: #eee;
+        }
+
+        /* Diff modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.4);
+            z-index: 100;
+            padding: 40px;
+            overflow-y: auto;
+        }
+
+        .modal.show {
+            display: block;
+        }
+
+        .modal-content {
+            max-width: 800px;
+            margin: 0 auto;
+            background: #fff;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.15);
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            background: #fafafa;
+            border-bottom: 1px solid #eee;
+        }
+
+        .modal-header h3 {
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: #999;
+            font-size: 20px;
+            cursor: pointer;
+        }
+
+        .modal-close:hover {
+            color: #333;
+        }
+
+        .diff-content {
+            padding: 16px;
+            font-family: 'SF Mono', Consolas, monospace;
+            font-size: 12px;
+            line-height: 1.5;
+            overflow-x: auto;
+            white-space: pre;
+            background: #fafafa;
+        }
+
+        .diff-add {
+            color: #2e7d32;
+            background: #e8f5e9;
+        }
+
+        .diff-del {
+            color: #c62828;
+            background: #ffebee;
+        }
+
+        .diff-header {
+            color: #1565c0;
+        }
+
+        /* Loading */
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+
+        /* Empty state */
+        .empty {
+            text-align: center;
+            padding: 60px;
+            color: #999;
+        }
+
+        .empty h3 {
+            margin-bottom: 8px;
+            color: #666;
+            font-weight: 500;
+        }
+
+        /* ALL button for tree view */
+        .view-all-btn {
+            display: block;
+            width: 100%;
+            padding: 8px 10px;
+            margin-bottom: 12px;
+            background: #f5f5f5;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 500;
+            color: #555;
+            text-align: center;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            transition: all 0.15s;
+        }
+
+        .view-all-btn:hover {
+            background: #eee;
+            border-color: #ccc;
+        }
+
+        .view-all-btn.active {
+            background: #333;
+            color: white;
+            border-color: #333;
+        }
+
+        /* Tree view container */
+        .tree-view {
+            padding: 20px;
+            overflow-x: auto;
+        }
+
+        .tree-view svg {
+            display: block;
+        }
+
+        .tree-node {
+            cursor: pointer;
+        }
+
+        .tree-node circle {
+            fill: #fff;
+            stroke: #999;
+            stroke-width: 2;
+            transition: all 0.15s;
+        }
+
+        .tree-node:hover circle {
+            stroke: #333;
+            transform: scale(1.2);
+            transform-origin: center;
+        }
+
+        .tree-node.head circle {
+            fill: #333;
+            stroke: #333;
+        }
+
+        .tree-node text {
+            font-family: 'SF Mono', Consolas, monospace;
+            font-size: 10px;
+            fill: #666;
+        }
+
+        .tree-edge {
+            stroke: #ddd;
+            stroke-width: 2;
+            fill: none;
+        }
+
+        .tree-edge.jump {
+            stroke-dasharray: 4 2;
+            stroke: #999;
+        }
+
+        .tree-jump-arrow {
+            stroke: #e74c3c;
+            stroke-width: 2;
+            stroke-dasharray: 6 3;
+            fill: none;
+            marker-end: url(#jump-arrowhead);
+        }
+
+        .tree-lane-label {
+            font-size: 11px;
+            fill: #999;
+            text-anchor: middle;
+        }
+
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-left">
+            <img src="/static/memov.jpg" alt="MemoV" class="header-logo">
+            <h1>MemoV Timeline</h1>
+        </div>
+        <div class="header-info" id="branch-info">Loading...</div>
+    </div>
+
+    <div class="container">
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <h2>Branches</h2>
+            </div>
+            <button class="view-all-btn" id="view-all-btn" onclick="showAllTree()">ALL</button>
+            <div id="branches-list">
+                <div class="loading">Loading...</div>
+            </div>
+        </div>
+
+        <div class="timeline">
+            <div class="timeline-container" id="timeline">
+                <div class="loading">Loading commits...</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Diff Modal -->
+    <div class="modal" id="diff-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 id="diff-title">Diff</h3>
+                <button class="modal-close" onclick="closeDiffModal()">&times;</button>
+            </div>
+            <div class="diff-content" id="diff-content"></div>
+        </div>
+    </div>
+
+    <script>
+        let graphData = null;
+        let branchesData = null;
+        let childToParent = {};
+        let nodeBranch = {}; // Maps commit hash to the branch it belongs to
+        let expandedNode = null;
+        let viewMode = 'branch'; // 'branch' | 'all'
+
+        // Build nodeBranch mapping: determine which branch each commit belongs to
+        // Shared commits belong to the "parent" branch (main first, then alphabetically)
+        function buildNodeBranchMapping() {
+            nodeBranch = {};
+            if (!branchesData?.branches) return;
+
+            const branches = Object.keys(branchesData.branches);
+            // Process main first, then others alphabetically
+            const orderedBranches = [];
+            if (branches.includes('main')) {
+                orderedBranches.push('main');
+            }
+            branches.filter(b => b !== 'main').sort().forEach(b => orderedBranches.push(b));
+
+            for (const branchName of orderedBranches) {
+                const tipCommit = branchesData.branches[branchName];
+                let current = tipCommit;
+                const branchNodes = [];
+
+                // Traverse from tip to root
+                while (current) {
+                    branchNodes.push(current);
+                    current = childToParent[current];
+                }
+
+                // Assign branch ownership (root to tip order)
+                // Only set if not already assigned (shared commits belong to parent branch)
+                branchNodes.reverse().forEach(nodeId => {
+                    if (!nodeBranch[nodeId]) {
+                        nodeBranch[nodeId] = branchName;
+                    }
+                });
+            }
+        }
+
+        // Fetch and render data
+        async function init() {
+            try {
+                // First check if memov is initialized
+                const statusRes = await fetch('/api/status');
+                const status = await statusRes.json();
+
+                if (!status.initialized) {
+                    document.getElementById('branches-list').innerHTML =
+                        '<div class="empty">Not initialized</div>';
+                    document.getElementById('timeline').innerHTML = `
+                        <div class="empty">
+                            <h3>MemoV Not Initialized</h3>
+                            <p>This project hasn't been set up with MemoV yet.</p>
+                            <p style="margin-top: 16px; font-family: monospace; background: #f5f5f5; padding: 12px; border-radius: 4px;">
+                                cd ${escapeHtml(status.project_path)}<br>
+                                mem init
+                            </p>
+                            <p style="margin-top: 16px; color: #666;">Then refresh this page.</p>
+                        </div>
+                    `;
+                    document.getElementById('branch-info').textContent = 'Not initialized';
+                    return;
+                }
+
+                const [branchesRes, graphRes] = await Promise.all([
+                    fetch('/api/branches'),
+                    fetch('/api/graph')
+                ]);
+
+                const branches = await branchesRes.json();
+                graphData = await graphRes.json();
+                branchesData = branches;
+
+                // Build childToParent mapping from edges (skip duplicates)
+                childToParent = {};
+                if (graphData.edges) {
+                    graphData.edges.forEach(e => {
+                        if (!childToParent[e.to]) {
+                            childToParent[e.to] = e.from;
+                        }
+                    });
+                }
+
+                // Build nodeBranch mapping (which branch each commit belongs to)
+                buildNodeBranchMapping();
+
+                renderBranches(branches);
+
+                // Default to ALL tree view
+                showAllTree();
+            } catch (error) {
+                console.error('Failed to load data:', error);
+                document.getElementById('timeline').innerHTML =
+                    '<div class="empty"><h3>Error loading data</h3><p>Check server connection and try again.</p></div>';
+            }
+        }
+
+        function renderBranches(branches) {
+            const container = document.getElementById('branches-list');
+            if (!branches.branches || Object.keys(branches.branches).length === 0) {
+                container.innerHTML = '<div class="empty">No branches</div>';
+                return;
+            }
+
+            // Count commits per branch using nodeBranch mapping
+            const branchCommitCounts = {};
+            for (const name of Object.keys(branches.branches)) {
+                branchCommitCounts[name] = 0;
+            }
+            // Count how many nodes belong to each branch
+            for (const [nodeId, branchName] of Object.entries(nodeBranch)) {
+                if (branchCommitCounts.hasOwnProperty(branchName)) {
+                    branchCommitCounts[branchName]++;
+                }
+            }
+
+            container.innerHTML = Object.entries(branches.branches)
+                .map(([name, hash]) => `
+                    <div class="branch-item ${name === branches.current ? 'active' : ''}"
+                         onclick="showBranchView('${name}')">
+                        ${name}
+                        <span class="count">${branchCommitCounts[name] || 0}</span>
+                    </div>
+                `).join('');
+        }
+
+        function renderTimeline(data) {
+            const container = document.getElementById('timeline');
+
+            if (!data.nodes || data.nodes.length === 0) {
+                container.innerHTML = '<div class="empty"><h3>No commits yet</h3><p>Start tracking files with mem track.</p></div>';
+                return;
+            }
+
+            // Topological sort (like git rev-list --reverse): parent before child
+            // Then reverse for display (most recent/child first)
+            const nodeMap = new Map(data.nodes.map(n => [n.id, n]));
+            const visited = new Set();
+            const sorted = [];
+
+            // DFS to get topological order
+            function visit(nodeId) {
+                if (visited.has(nodeId)) return;
+                visited.add(nodeId);
+                // Visit parent first (if exists)
+                const parentId = childToParent[nodeId];
+                if (parentId && nodeMap.has(parentId)) {
+                    visit(parentId);
+                }
+                sorted.push(nodeMap.get(nodeId));
+            }
+
+            // Visit all nodes
+            data.nodes.forEach(n => visit(n.id));
+
+            // Reverse: child (newest) first for display
+            const sortedNodes = sorted.reverse();
+
+            container.innerHTML = sortedNodes.map(node => `
+                <div class="node" data-id="${node.id}">
+                    <div class="node-line"></div>
+                    <div class="node-dot ${node.is_head ? 'head' : ''}" data-label="${node.short_hash}${node.branch ? ' [' + node.branch + ']' : ''}" onclick="toggleNode('${node.id}')"></div>
+                    <div class="node-card" id="card-${node.id}" onclick="toggleNode('${node.id}')">
+                        <div class="node-header">
+                            <span class="node-hash">${node.short_hash}</span>
+                            <span class="node-operation">${node.operation || 'snap'}</span>
+                            ${node.branch ? `<span class="node-branch">${node.branch}</span>` : ''}
+                            <span class="node-time">${formatTime(node.timestamp)}</span>
+                        </div>
+                        <div class="node-prompt">${escapeHtml(node.prompt || 'No prompt')}</div>
+                        <div class="node-files">
+                            ${renderNodeFiles(node)}
+                        </div>
+                        <div class="node-details">
+                            ${node.prompt ? `
+                            <div class="detail-section">
+                                <h4>Prompt</h4>
+                                <p>${escapeHtml(node.prompt)}</p>
+                            </div>
+                            ` : ''}
+                            ${node.agent_plan ? `
+                            <div class="detail-section">
+                                <h4>Agent Plan</h4>
+                                <p>${escapeHtml(node.agent_plan)}</p>
+                            </div>
+                            ` : ''}
+                            ${node.response ? `
+                            <div class="detail-section">
+                                <h4>Response</h4>
+                                <p>${escapeHtml(node.response)}</p>
+                            </div>
+                            ` : ''}
+                            <div class="detail-section">
+                                <h4>Files</h4>
+                                <div class="detail-files">
+                                    ${renderFilesList(node)}
+                                </div>
+                            </div>
+                            <div style="display: flex; gap: 8px;">
+                                <button class="btn" onclick="event.stopPropagation(); viewDiff('${node.id}')">View Diff</button>
+                                <button class="btn btn-secondary" onclick="event.stopPropagation(); jumpTo('${node.id}')">Jump Here</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function toggleNode(id) {
+            const card = document.getElementById(`card-${id}`);
+            if (expandedNode && expandedNode !== id) {
+                document.getElementById(`card-${expandedNode}`)?.classList.remove('expanded');
+            }
+            card.classList.toggle('expanded');
+            expandedNode = card.classList.contains('expanded') ? id : null;
+        }
+
+        async function viewDiff(commitHash) {
+            try {
+                const res = await fetch(`/api/diff/${commitHash}`);
+                const data = await res.json();
+
+                document.getElementById('diff-title').textContent = `Diff: ${commitHash.substring(0, 7)}`;
+
+                const diffHtml = formatDiff(data.diff);
+                document.getElementById('diff-content').innerHTML = diffHtml;
+                document.getElementById('diff-modal').classList.add('show');
+            } catch (error) {
+                console.error('Failed to load diff:', error);
+                alert('Failed to load diff');
+            }
+        }
+
+        function closeDiffModal() {
+            document.getElementById('diff-modal').classList.remove('show');
+        }
+
+        async function jumpTo(commitHash) {
+            if (!confirm(`Jump to commit ${commitHash.substring(0, 7)}?\n\nThis will restore all files to this state.`)) {
+                return;
+            }
+
+            try {
+                const res = await fetch(`/api/jump/${commitHash}`, { method: 'POST' });
+                const data = await res.json();
+
+                if (data.status === 'success') {
+                    alert(`Jumped to commit!\nNew branch: ${data.new_branch}`);
+                    location.reload();
+                } else {
+                    alert('Jump failed');
+                }
+            } catch (error) {
+                console.error('Failed to jump:', error);
+                alert('Failed to jump to commit');
+            }
+        }
+
+        function filterBranch(branchName, skipScroll = false) {
+            // Update sidebar highlight
+            const branchItems = document.querySelectorAll('.branch-item');
+            branchItems.forEach(item => {
+                // Get the branch name from the item (text content minus the count)
+                const itemName = item.childNodes[0].textContent.trim();
+                if (itemName === branchName) {
+                    item.classList.add('current');
+                } else {
+                    item.classList.remove('current');
+                }
+            });
+
+            // Update header info
+            document.getElementById('branch-info').textContent = `Current: ${branchName}`;
+
+            // Get the tip commit of this branch (for scrolling)
+            const tipCommit = branchesData?.branches?.[branchName];
+
+            // Show only commits belonging to this branch (using nodeBranch mapping)
+            const nodes = document.querySelectorAll('.node');
+            nodes.forEach(node => {
+                const nodeId = node.dataset.id;
+                if (nodeBranch[nodeId] === branchName) {
+                    node.style.display = '';
+                } else {
+                    node.style.display = 'none';
+                }
+            });
+
+            // Scroll to the tip commit (most recent in this branch)
+            if (!skipScroll && tipCommit) {
+                const targetNode = document.querySelector(`.node[data-id="${tipCommit}"]`);
+                if (targetNode) {
+                    targetNode.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }
+        }
+
+        function showAllTree() {
+            viewMode = 'all';
+
+            // Update button states
+            document.getElementById('view-all-btn').classList.add('active');
+            document.querySelectorAll('.branch-item').forEach(item => {
+                item.classList.remove('current');
+            });
+
+            // Update header
+            document.getElementById('branch-info').textContent = 'All Branches';
+
+            // Render tree view
+            renderTreeView();
+        }
+
+        function showBranchView(branchName) {
+            // If switching from tree view, re-render timeline first
+            if (viewMode === 'all') {
+                renderTimeline(graphData);
+            }
+            viewMode = 'branch';
+            document.getElementById('view-all-btn').classList.remove('active');
+            filterBranch(branchName);
+        }
+
+        function renderTreeView() {
+            const container = document.getElementById('timeline');
+
+            if (!graphData || !graphData.nodes || graphData.nodes.length === 0) {
+                container.innerHTML = '<div class="empty"><h3>No commits yet</h3></div>';
+                return;
+            }
+
+            // Assign lanes to branches (main = 0, others = 1, 2, ...)
+            const branches = Object.keys(branchesData.branches || {});
+            const branchLane = {};
+            let laneIndex = 0;
+
+            // Main branch first
+            if (branches.includes('main')) {
+                branchLane['main'] = laneIndex++;
+            }
+            // Then other branches
+            branches.filter(b => b !== 'main').sort().forEach(b => {
+                branchLane[b] = laneIndex++;
+            });
+
+            // Build node info: which branch each node belongs to
+            const nodeBranch = {};
+            const nodeDepth = {}; // depth from root
+
+            for (const [branchName, tipCommit] of Object.entries(branchesData.branches || {})) {
+                let current = tipCommit;
+                let depth = 0;
+                const branchNodes = [];
+
+                // Traverse from tip to root
+                while (current) {
+                    branchNodes.push(current);
+                    current = childToParent[current];
+                }
+
+                // Assign depths (root = 0, tip = highest)
+                branchNodes.reverse().forEach((nodeId, idx) => {
+                    // Only set if not already assigned (shared commits belong to parent branch)
+                    if (!nodeBranch[nodeId]) {
+                        nodeBranch[nodeId] = branchName;
+                    }
+                    // Depth is from root
+                    nodeDepth[nodeId] = Math.max(nodeDepth[nodeId] || 0, idx);
+                });
+            }
+
+            // Find max depth for height calculation
+            const maxDepth = Math.max(...Object.values(nodeDepth), 0);
+            const numLanes = Object.keys(branchLane).length || 1;
+
+            // SVG dimensions
+            const laneWidth = 80;
+            const rowHeight = 50;
+            const nodeRadius = 8;
+            const padding = 40;
+            const labelHeight = 30;
+
+            // Extra width for jump arrows that curve to the right
+            const jumpArrowSpace = (graphData.jump_edges && graphData.jump_edges.length > 0) ? 60 : 0;
+            const svgWidth = numLanes * laneWidth + padding * 2 + jumpArrowSpace;
+            const svgHeight = (maxDepth + 1) * rowHeight + padding * 2 + labelHeight;
+
+            // Calculate node positions
+            const nodePositions = {};
+            graphData.nodes.forEach(node => {
+                const branch = nodeBranch[node.id] || 'main';
+                const lane = branchLane[branch] ?? 0;
+                const depth = nodeDepth[node.id] ?? 0;
+
+                nodePositions[node.id] = {
+                    x: padding + lane * laneWidth + laneWidth / 2,
+                    y: svgHeight - padding - depth * rowHeight - nodeRadius,
+                    lane: lane,
+                    branch: branch,
+                    depth: depth
+                };
+            });
+
+            // Build SVG content
+            let svgContent = '';
+
+            // Lane labels at top
+            for (const [branchName, lane] of Object.entries(branchLane)) {
+                const x = padding + lane * laneWidth + laneWidth / 2;
+                svgContent += `<text class="tree-lane-label" x="${x}" y="${labelHeight - 10}">${branchName}</text>`;
+            }
+
+            // Draw edges first (so they're behind nodes)
+            graphData.edges.forEach(edge => {
+                const fromPos = nodePositions[edge.from];
+                const toPos = nodePositions[edge.to];
+
+                if (!fromPos || !toPos) return;
+
+                // Check if this is a jump edge (crosses lanes)
+                const isJump = fromPos.lane !== toPos.lane;
+                const edgeClass = isJump ? 'tree-edge jump' : 'tree-edge';
+
+                if (fromPos.lane === toPos.lane) {
+                    // Same lane: straight vertical line
+                    svgContent += `<line class="${edgeClass}" x1="${fromPos.x}" y1="${fromPos.y}" x2="${toPos.x}" y2="${toPos.y}"/>`;
+                } else {
+                    // Different lanes: curved path
+                    const midY = (fromPos.y + toPos.y) / 2;
+                    svgContent += `<path class="${edgeClass}" d="M${fromPos.x},${fromPos.y} C${fromPos.x},${midY} ${toPos.x},${midY} ${toPos.x},${toPos.y}"/>`;
+                }
+            });
+
+            // Draw nodes
+            graphData.nodes.forEach(node => {
+                const pos = nodePositions[node.id];
+                if (!pos) return;
+
+                const isHead = node.is_head;
+                const nodeClass = isHead ? 'tree-node head' : 'tree-node';
+
+                svgContent += `
+                    <g class="${nodeClass}" onclick="toggleNodeFromTree('${node.id}')" data-id="${node.id}">
+                        <circle cx="${pos.x}" cy="${pos.y}" r="${nodeRadius}"/>
+                        <text x="${pos.x + nodeRadius + 4}" y="${pos.y + 3}">${node.short_hash}</text>
+                    </g>
+                `;
+            });
+
+            // Draw jump arrows (from source commit to target commit)
+            if (graphData.jump_edges) {
+                graphData.jump_edges.forEach(jumpEdge => {
+                    const fromPos = nodePositions[jumpEdge.from_commit];
+                    const toPos = nodePositions[jumpEdge.to_commit];
+
+                    if (!fromPos || !toPos) return;
+
+                    // Draw curved arrow from source to target
+                    // Arrow goes from the commit we were at, to the commit we jumped to
+                    const dx = toPos.x - fromPos.x;
+                    const dy = toPos.y - fromPos.y;
+
+                    // Control point for curve (offset to the right to make it visible)
+                    const offsetX = Math.max(40, Math.abs(dx) * 0.3);
+                    const ctrlX = Math.max(fromPos.x, toPos.x) + offsetX;
+                    const ctrlY = (fromPos.y + toPos.y) / 2;
+
+                    svgContent += `<path class="tree-jump-arrow" d="M${fromPos.x},${fromPos.y} Q${ctrlX},${ctrlY} ${toPos.x},${toPos.y}"/>`;
+                });
+            }
+
+            container.innerHTML = `
+                <div class="tree-view">
+                    <svg width="${svgWidth}" height="${svgHeight}" viewBox="0 0 ${svgWidth} ${svgHeight}">
+                        <defs>
+                            <marker id="jump-arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                                <polygon points="0 0, 10 3.5, 0 7" fill="#e74c3c"/>
+                            </marker>
+                        </defs>
+                        ${svgContent}
+                    </svg>
+                </div>
+            `;
+        }
+
+        function toggleNodeFromTree(nodeId) {
+            // Find the node data
+            const node = graphData.nodes.find(n => n.id === nodeId);
+            if (!node) return;
+
+            // Show a simple popup with node details
+            const details = `
+Commit: ${node.short_hash}
+Branch: ${node.branch || 'unknown'}
+Operation: ${node.operation || 'snap'}
+Time: ${formatTime(node.timestamp)}
+
+Prompt: ${node.prompt || 'No prompt'}
+
+Files: ${(node.files || []).join(', ') || 'None'}
+            `.trim();
+
+            if (confirm(details + '\n\nJump to this commit?')) {
+                jumpTo(nodeId);
+            }
+        }
+
+        function formatTime(timestamp) {
+            if (!timestamp) return '';
+            const date = new Date(timestamp);
+            return date.toLocaleString();
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        function renderNodeFiles(node) {
+            const files = node.files || [];
+            const diff = node.diff || {};
+            const maxShow = 4;
+
+            if (files.length === 0) return '';
+
+            const shown = files.slice(0, maxShow);
+            const remaining = files.length - maxShow;
+
+            let html = shown.map(f => {
+                const fileDiff = diff[f];
+                let status = 'unchanged';
+                if (fileDiff) {
+                    status = fileDiff.status || 'modified';
+                }
+                const fileName = f.split('/').pop();
+                return `<span class="node-file ${status}">${fileName}</span>`;
+            }).join('');
+
+            if (remaining > 0) {
+                html += `<span class="node-file more">+${remaining}</span>`;
+            }
+
+            return html;
+        }
+
+        function renderFilesList(node) {
+            const files = node.files || [];
+            const diff = node.diff || {};
+
+            if (files.length === 0) {
+                return '<span style="color: #999; font-size: 12px;">No files</span>';
+            }
+
+            return files.map(f => {
+                const fileDiff = diff[f];
+                let status = 'unchanged';
+                let icon = '·';
+
+                if (fileDiff) {
+                    status = fileDiff.status || 'modified';
+                    if (status === 'added') icon = '+';
+                    else if (status === 'deleted') icon = '−';
+                    else if (status === 'modified') icon = '~';
+                }
+
+                // Get just the filename for display
+                const fileName = f.split('/').pop();
+                const hasPath = f.includes('/');
+                const title = hasPath ? f : '';
+
+                return `<span class="detail-file ${status}"
+                             onclick="event.stopPropagation(); showFileDiff('${node.id}', '${f}')"
+                             title="${title}">
+                    <span class="status-icon">${icon}</span>${fileName}
+                </span>`;
+            }).join('');
+        }
+
+        function showFileDiff(commitHash, fileName) {
+            const node = graphData.nodes.find(n => n.id === commitHash);
+            if (!node || !node.diff || !node.diff[fileName]) {
+                alert('No diff available for this file');
+                return;
+            }
+
+            const fileDiff = node.diff[fileName];
+            document.getElementById('diff-title').textContent = `${fileName} (${commitHash.substring(0, 7)})`;
+
+            // Render structured diff
+            let html = '';
+            if (fileDiff.hunks && fileDiff.hunks.length > 0) {
+                fileDiff.hunks.forEach(hunk => {
+                    html += `<span class="diff-header">${escapeHtml(hunk.header)}</span>\n`;
+                    hunk.lines.forEach(line => {
+                        if (line.type === 'add') {
+                            html += `<span class="diff-add">+${escapeHtml(line.content)}</span>\n`;
+                        } else if (line.type === 'delete') {
+                            html += `<span class="diff-del">-${escapeHtml(line.content)}</span>\n`;
+                        } else if (line.type === 'context') {
+                            html += ` ${escapeHtml(line.content)}\n`;
+                        } else if (line.type === 'info') {
+                            html += `<span class="diff-header">${escapeHtml(line.content)}</span>\n`;
+                        }
+                    });
+                });
+            } else {
+                html = '<span style="color:#999">No changes in this file</span>';
+            }
+
+            document.getElementById('diff-content').innerHTML = html;
+            document.getElementById('diff-modal').classList.add('show');
+        }
+
+        function formatDiff(diff) {
+            if (!diff) return '<span style="color:#999">No diff available</span>';
+
+            // Handle _all key (combined diff)
+            const content = diff._all || Object.values(diff).join('\n\n');
+
+            return content.split('\n').map(line => {
+                if (line.startsWith('+') && !line.startsWith('+++')) {
+                    return `<span class="diff-add">${escapeHtml(line)}</span>`;
+                } else if (line.startsWith('-') && !line.startsWith('---')) {
+                    return `<span class="diff-del">${escapeHtml(line)}</span>`;
+                } else if (line.startsWith('@@') || line.startsWith('diff ') || line.startsWith('index ')) {
+                    return `<span class="diff-header">${escapeHtml(line)}</span>`;
+                }
+                return escapeHtml(line);
+            }).join('\n');
+        }
+
+        // Close modal on escape
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeDiffModal();
+            }
+        });
+
+        // Close modal on background click
+        document.getElementById('diff-modal').addEventListener('click', (e) => {
+            if (e.target === document.getElementById('diff-modal')) {
+                closeDiffModal();
+            }
+        });
+
+        // Initialize
+        init();
+    </script>
+</body>
+</html>
