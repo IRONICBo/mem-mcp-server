@@ -587,18 +587,41 @@
                 }
 
                 renderBranches(branches);
-                renderTimeline(graphData);
 
-                // Highlight current branch's commits on initial load (skip scroll)
-                if (branches.current) {
-                    filterBranch(branches.current, true);
-                } else {
-                    document.getElementById('branch-info').textContent = 'detached';
-                }
+                // Default to ALL tree view (skip refresh since we just loaded)
+                showAllTree(true);
             } catch (error) {
                 console.error('Failed to load data:', error);
                 document.getElementById('timeline').innerHTML =
                     '<div class="empty"><h3>Error loading data</h3><p>Check server connection and try again.</p></div>';
+            }
+        }
+
+        async function refreshData() {
+            // Refresh graph and branches data from server
+            try {
+                const [branchesRes, graphRes] = await Promise.all([
+                    fetch('/api/branches'),
+                    fetch('/api/graph')
+                ]);
+
+                const branches = await branchesRes.json();
+                graphData = await graphRes.json();
+                branchesData = branches;
+
+                // Rebuild childToParent mapping
+                childToParent = {};
+                if (graphData.edges) {
+                    graphData.edges.forEach(e => {
+                        if (!childToParent[e.to]) {
+                            childToParent[e.to] = e.from;
+                        }
+                    });
+                }
+
+                renderBranches(branches);
+            } catch (error) {
+                console.error('Failed to refresh data:', error);
             }
         }
 
@@ -819,7 +842,12 @@
             }
         }
 
-        function showAllTree() {
+        async function showAllTree(skipRefresh = false) {
+            // Refresh data before switching view (unless initial load)
+            if (!skipRefresh) {
+                await refreshData();
+            }
+
             viewMode = 'all';
 
             // Update button states
@@ -835,7 +863,10 @@
             renderTreeView();
         }
 
-        function showBranchView(branchName) {
+        async function showBranchView(branchName) {
+            // Refresh data before switching view
+            await refreshData();
+
             // If switching from tree view, re-render timeline first
             if (viewMode === 'all') {
                 renderTimeline(graphData);
