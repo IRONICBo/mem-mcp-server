@@ -870,14 +870,14 @@
                 current = childToParent[current];
             }
 
-            // Highlight only commits belonging to this branch
+            // Show only commits belonging to this branch
             const nodes = document.querySelectorAll('.node');
             nodes.forEach(node => {
                 const nodeId = node.dataset.id;
                 if (branchCommits.has(nodeId)) {
-                    node.style.opacity = '1';
+                    node.style.display = '';
                 } else {
-                    node.style.opacity = '0.3';
+                    node.style.display = 'none';
                 }
             });
 
