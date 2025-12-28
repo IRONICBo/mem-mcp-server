@@ -514,6 +514,89 @@ class MemMCPTools:
 
     @staticmethod
     @mcp.tool()
+    def mem_ui(port: int = 38888) -> str:
+        """Open the MemoV Web UI to visually browse your AI coding history.
+
+        **Purpose:**
+        Launch a local web interface for exploring your memov history with:
+        - Timeline view of all commits
+        - Branch filtering and navigation
+        - Visual diff viewer for each file
+        - Jump to any snapshot with one click
+
+        **When to use:**
+        - To get a visual overview of your AI coding history
+        - When you need to explore commits interactively
+        - To compare changes across multiple snapshots
+        - Before jumping to a previous state
+
+        Args:
+            port: Port number for the web server (default: 38888)
+
+        Returns:
+            URL to open in browser
+        """
+        import subprocess
+        import sys
+        import time
+
+        try:
+            LOGGER.info(f"mem_ui called with port={port}")
+
+            if MemMCPTools._project_path is None:
+                raise ValueError("Project path is not set.")
+
+            if not os.path.exists(MemMCPTools._project_path):
+                raise ValueError(f"Project path '{MemMCPTools._project_path}' does not exist.")
+
+            memov_manager = MemovManager(project_path=MemMCPTools._project_path)
+
+            if (check_status := memov_manager.check()) is not MemStatus.SUCCESS:
+                return f"[ERROR] Memov not initialized: {check_status}. Run 'mem init' first."
+
+            # Start the web server in background
+            url = f"http://localhost:{port}"
+
+            # Use subprocess to start the web server
+            cmd = [
+                sys.executable,
+                "-c",
+                f"from memov.web.server import start_server; start_server('{MemMCPTools._project_path}', port={port})",
+            ]
+
+            # Start in background (non-blocking)
+            subprocess.Popen(
+                cmd,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
+
+            # Give it a moment to start
+            time.sleep(1)
+
+            lines = []
+            lines.append("[SUCCESS] MemoV Web UI started!")
+            lines.append("")
+            lines.append(f"🌐 Open in browser: {url}")
+            lines.append("")
+            lines.append("Features:")
+            lines.append("  • Timeline view with expandable commit cards")
+            lines.append("  • Branch filtering in sidebar")
+            lines.append("  • Click any file to view its diff")
+            lines.append("  • Jump to any snapshot with one click")
+            lines.append("")
+            lines.append("The server runs in background. Close the terminal to stop it.")
+
+            return "\n".join(lines)
+
+        except Exception as e:
+            error_msg = f"[ERROR] Error in mem_ui: {str(e)}"
+            LOGGER.error(error_msg, exc_info=True)
+            return error_msg
+
+    @staticmethod
+    @mcp.tool()
     def mem_jump(commit_hash: str) -> str:
         """Jump to a specific snapshot, restoring all tracked files and creating a new branch.
 

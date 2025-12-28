@@ -9,8 +9,9 @@ from typing_extensions import Annotated
 # Lazy imports for faster startup - only import heavy modules when needed
 # These imports are deferred until get_manager() is called
 if TYPE_CHECKING:
-    from memov.core.manager import MemovManager, MemStatus
     from rich.console import Console
+
+    from memov.core.manager import MemovManager, MemStatus
 
 # Lazy console initialization
 _console: Optional["Console"] = None
@@ -24,7 +25,6 @@ def get_console() -> "Console":
 
         _console = Console()
     return _console
-
 
 
 # Common type aliases
@@ -570,6 +570,7 @@ def _ui_start(loc: str, port: int, foreground: bool) -> None:
     from memov.web.server import start_server
 
     project_path = os.path.abspath(loc)
+    console = get_console()
 
     if foreground:
         # Run in foreground (blocking)
@@ -601,6 +602,7 @@ def ui_status(loc: LocOption = ".") -> None:
 
     project_path = os.path.abspath(loc)
     servers = UIManager.status(project_path)
+    console = get_console()
 
     if not servers:
         console.print(f"[yellow]No server running for {project_path}[/yellow]")
@@ -628,6 +630,7 @@ def ui_stop(loc: LocOption = ".") -> None:
     from memov.web.manager import UIManager
 
     project_path = os.path.abspath(loc)
+    console = get_console()
     console.print(f"[blue]Stopping MemoV Web UI...[/blue]")
 
     success, message = UIManager.stop(project_path)

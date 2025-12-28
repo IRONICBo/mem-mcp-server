@@ -14,15 +14,14 @@
 
 </div>
 
-MemoV as VibeGit = Prompt + Agent Plan + CodeDiff, all under version control.
 A local, zero-friction memory layer for AI coding — every prompt, agent decision, and code diff versioned automatically, without touching Git.
+MemoV as VibeGit = Prompt + Agent Plan + CodeDiff, all under version control.
 
-<p align="center">
+<!-- <p align="center">
   <img src="docs/images/readme.gif" alt="MemoV Demo" width="800px">
-</p>
+</p> -->
 
 - 💬 [Join our Discord](https://discord.gg/un54aD7Hug) and dive into smarter context engineering
-- 🌐 [Visit memov.ai](https://memov.ai) to visualize your coding memory and supercharge existing GitHub repos
 
 <!-- <div align="center">
 
@@ -33,12 +32,12 @@ A local, zero-friction memory layer for AI coding — every prompt, agent decisi
 
 ## Features
 
-- ⚡ **Zero-friction** — One command to install. No workflow changes.
-- 🧠 **Full context capture** — Prompts, plans, diffs stored as-is. Git stores results, VibeGit stores reasoning.
-- ⏪ **Time-travel** — Jump, branch, rewind to any point. Track how you explored, not just what you shipped.
-- 🔍 **Visual UI** — Search and navigate your AI coding history locally.
-- 🔒 **Privacy-first** — Fully local. No cloud, no training, no leakage.
-- 🧼 **Git untouched** — Shadow `.mem` timeline. No polluted commits.
+- ⚡ **One-click MCP** — Works with any AI coding agent
+- 🧠 **Full context** — Prompts + Plans + Diffs. Git stores code, VibeGit stores intent
+- ⏪ **Time-travel** — Branch, rollback, replay any interaction
+- 🔍 **Visual UI** — Browse your AI coding history
+- 🔒 **Local-first** — No cloud, no database, no overhead
+- 🧼 **Git-safe** — Shadow `.mem` timeline, zero pollution on `.git` 
 
 ## Quick Start (MCP Installation)
 
@@ -237,6 +236,15 @@ These are available to MCP clients through the server:
 
 - `snap(user_prompt: str, original_response: str, agent_plan: list[str], files_changed: str)`
   - Record every user interaction with automatic file tracking. Handles untracked vs modified files intelligently.
+
+- `mem_ui(port: int = 38888)`
+  - Launch the Web UI at `http://localhost:38888` to visually browse history, view diffs, and jump to any snapshot.
+
+- `mem_history(limit: int = 20, commit_hash: str = "")`
+  - View memov history with prompts, responses, and file changes.
+
+- `mem_jump(commit_hash: str)`
+  - Jump to a specific snapshot, restoring all tracked files and creating a new branch.
 
 ### RAG Tools (requires `[rag]` extras)
 
