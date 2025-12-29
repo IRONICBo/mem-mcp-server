@@ -61,6 +61,14 @@ Run in your project root directory:
 claude mcp add mem-mcp --scope project -- uvx --from git+https://github.com/memovai/memov.git mem-mcp-launcher stdio $(pwd)
 ```
 
+### Codex
+
+Run in your project root directory:
+
+```bash
+codex mcp add mem-mcp -- uvx --from git+https://github.com/memovai/memov.git mem-mcp-launcher stdio $(pwd)
+```
+
 ### VS Code
 
 Create `.vscode/mcp.json` in your project root:
@@ -106,11 +114,7 @@ Go to **Files > Preferences > Cursor Settings > MCP**, then add:
 
 ### Web UI
 
-```bash
-mem web --loc /path/to/project
-```
-
-Opens at `http://localhost:38888` with timeline view, branch filtering, diff viewer, and jump to any snapshot.
+Just say **"use mem ui"** in the chat — opens at `http://localhost:38888` with timeline view, branch filtering, diff viewer, and jump to any snapshot.
 
 ### With VectorDB (RAG mode)
 
