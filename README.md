@@ -13,8 +13,11 @@
 [![Twitter Follow](https://img.shields.io/twitter/follow/ssslvky?style=social)](https://x.com/ssslvky)
 
 </div>
-Traceable, Git-compatible memory for AI coding. Prompts, context, and code diffs — **auto **versioned.
 
+Traceable, Git-compatible memory for AI coding. Prompts, context, and code diffs **auto versioned** — avoid 1000 **manual** commits, your .git still stays **clean**.
+
+
+<div align="center">
 
 | MemoV | Checkpoints |
 |-------|-------------|
@@ -22,6 +25,8 @@ Traceable, Git-compatible memory for AI coding. Prompts, context, and code diffs
 | Cross-session | Session-bound |
 | Rollback preserves all | Rollback erases history |
 | Every jump tracked | No trajectory |
+
+</div>
 
 <!-- <p align="center">
   <img src="docs/images/readme.gif" alt="MemoV Demo" width="800px">
