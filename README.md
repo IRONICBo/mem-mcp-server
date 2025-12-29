@@ -13,9 +13,15 @@
 [![Twitter Follow](https://img.shields.io/twitter/follow/ssslvky?style=social)](https://x.com/ssslvky)
 
 </div>
+Traceable, Git-compatible memory for AI coding. Prompts, context, and code diffs — **auto **versioned.
 
-A local, zero-friction memory layer for AI coding — every prompt, agent decision, and code diff versioned automatically, without touching Git.
-MemoV as VibeGit = Prompt + Agent Plan + CodeDiff, all under version control.
+
+| MemoV | Checkpoints |
+|-------|-------------|
+| Branch exploration | Linear timeline |
+| Cross-session | Session-bound |
+| Rollback preserves all | Rollback erases history |
+| Every jump tracked | No trajectory |
 
 <!-- <p align="center">
   <img src="docs/images/readme.gif" alt="MemoV Demo" width="800px">
@@ -33,11 +39,12 @@ MemoV as VibeGit = Prompt + Agent Plan + CodeDiff, all under version control.
 ## Features
 
 - ⚡ **One-click MCP** — Works with any AI coding agent
-- 🧠 **Full context** — Prompts + Plans + Diffs. Git stores code, VibeGit stores intent
-- ⏪ **Time-travel** — Branch, rollback, replay any interaction
+- 🧠 **Full context** — Every prompt → agent plan → code diff is captured in real time
+- ⏪ **Version Control** — Branch, rollback, replay any interaction
+- 🧼 **Keep Git Clean** — Shadow `.mem` timeline, zero pollution on `.git` 
 - 🔍 **Visual UI** — Browse your AI coding history
-- 🔒 **Local-first** — No cloud, no database, no overhead
-- 🧼 **Git-safe** — Shadow `.mem` timeline, zero pollution on `.git` 
+- 🔒 **Private-first** — Local, no database, no overhead
+
 
 ## Quick Start (MCP Installation)
 
