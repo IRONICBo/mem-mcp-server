@@ -4,7 +4,11 @@
   </a>
 </p>
 
-# VibeGit: Auto-manage your prompts, plans, and diffs.
+<p align="center">
+  <b>English</b> | <a href="README_CN.md">简体中文</a> | <a href="README_JA.md">日本語</a>
+</p>
+
+# VibeGit🤌: Auto-track your prompts, context & code diffs.
 
 <div align="center">
 
@@ -14,7 +18,9 @@
 
 </div>
 
-Traceable, Git-compatible memory for AI coding. Prompts, context, and code diffs **auto versioned** — avoid 1000 **manual** commits, your .git still stays **clean**.
+Traceable, Git-powered memory for AI coding. Prompts, context, and code diffs **auto versioned** - it's VibeGit!🤌
+
+Avoid 1000+ **manual** commits, your **.git** still stays clean.
 
 
 <div align="center">
@@ -32,7 +38,7 @@ Traceable, Git-compatible memory for AI coding. Prompts, context, and code diffs
   <img src="docs/images/readme.gif" alt="MemoV Demo" width="800px">
 </p> -->
 
-- 💬 [Join our Discord](https://discord.gg/un54aD7Hug) and dive into smarter context engineering
+- 💬 [Join our Discord](https://discord.gg/un54aD7Hug) and dive into smarter vibe engineering
 
 <!-- <div align="center">
 
