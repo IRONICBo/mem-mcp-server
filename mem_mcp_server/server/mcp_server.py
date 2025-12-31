@@ -558,19 +558,35 @@ class MemMCPTools:
             url = f"http://localhost:{port}"
 
             # Use subprocess to start the web server
+            # Use repr() to properly escape the path (handles Windows backslashes)
+            escaped_path = repr(MemMCPTools._project_path)
             cmd = [
                 sys.executable,
                 "-c",
-                f"from memov.web.server import start_server; start_server('{MemMCPTools._project_path}', port={port})",
+                f"from memov.web.server import start_server; start_server({escaped_path}, port={port})",
             ]
 
-            # Start in background (non-blocking)
-            subprocess.Popen(
-                cmd,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                start_new_session=True,
-            )
+            # Platform-specific subprocess options for background process
+            import platform
+
+            if platform.system() == "Windows":
+                # Windows: use CREATE_NEW_PROCESS_GROUP and DETACHED_PROCESS
+                creationflags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS
+                subprocess.Popen(
+                    cmd,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    stdin=subprocess.DEVNULL,
+                    creationflags=creationflags,
+                )
+            else:
+                # Unix: use start_new_session
+                subprocess.Popen(
+                    cmd,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                    start_new_session=True,
+                )
 
             # Give it a moment to start
             time.sleep(1)

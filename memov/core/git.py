@@ -27,6 +27,9 @@ def subprocess_call(
         # Only set encoding when text mode is True
         if text:
             kwargs["encoding"] = "utf-8"
+            # Windows: handle potential encoding errors from git output
+            if sys.platform == "win32":
+                kwargs["errors"] = "replace"
 
         if input is not None:
             kwargs["input"] = input

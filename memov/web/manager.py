@@ -3,6 +3,7 @@
 import datetime
 import json
 import os
+import platform
 import socket
 import subprocess
 import sys
@@ -12,7 +13,24 @@ from typing import Optional
 
 import psutil
 
-CONFIG_DIR = Path.home() / ".config" / "memov"
+
+def _get_config_dir() -> Path:
+    """Get platform-appropriate config directory."""
+    if platform.system() == "Windows":
+        # Use APPDATA on Windows
+        appdata = os.environ.get("APPDATA")
+        if appdata:
+            return Path(appdata) / "memov"
+        return Path.home() / ".memov"
+    else:
+        # Use XDG_CONFIG_HOME or ~/.config on Unix
+        xdg_config = os.environ.get("XDG_CONFIG_HOME")
+        if xdg_config:
+            return Path(xdg_config) / "memov"
+        return Path.home() / ".config" / "memov"
+
+
+CONFIG_DIR = _get_config_dir()
 SERVERS_FILE = CONFIG_DIR / "ui_servers.json"
 
 
@@ -99,21 +117,36 @@ class UIManager:
 
         # Start server in background
         # Use python -m memov.web.launcher to start
-        process = subprocess.Popen(
-            [
-                sys.executable,
-                "-m",
-                "memov.web.launcher",
-                project_path,
-                "--port",
-                str(port),
-                "--host",
-                host,
-            ],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            start_new_session=True,
-        )
+        cmd = [
+            sys.executable,
+            "-m",
+            "memov.web.launcher",
+            project_path,
+            "--port",
+            str(port),
+            "--host",
+            host,
+        ]
+
+        # Platform-specific subprocess options for background process
+        if platform.system() == "Windows":
+            # Windows: use CREATE_NEW_PROCESS_GROUP and DETACHED_PROCESS
+            creationflags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS
+            process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                stdin=subprocess.DEVNULL,
+                creationflags=creationflags,
+            )
+        else:
+            # Unix: use start_new_session
+            process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
 
         # Wait a moment for server to start
         time.sleep(1.5)
