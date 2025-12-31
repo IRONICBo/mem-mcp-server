@@ -2,12 +2,13 @@
 
 import logging
 import os
+import traceback
 from pathlib import Path
 from typing import Optional
 
 import uvicorn
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from memov.core.manager import MemovManager, MemStatus
@@ -24,6 +25,17 @@ def create_app(project_path: str) -> "FastAPI":
     _project_path = project_path
 
     app = FastAPI(title="MemoV Web UI", version="1.0.0")
+
+    # Global exception handler for better error messages
+    @app.exception_handler(Exception)
+    async def global_exception_handler(request: Request, exc: Exception):
+        error_detail = f"{type(exc).__name__}: {str(exc)}"
+        tb = traceback.format_exc()
+        LOGGER.error(f"Unhandled exception: {error_detail}\n{tb}")
+        return JSONResponse(
+            status_code=500,
+            content={"detail": error_detail, "traceback": tb},
+        )
 
     # API Routes
     @app.get("/api/status")
@@ -178,7 +190,8 @@ def create_app(project_path: str) -> "FastAPI":
             """Serve the main HTML page."""
             index_path = static_dir / "index.html"
             if index_path.exists():
-                return HTMLResponse(content=index_path.read_text(), status_code=200)
+                # Use explicit utf-8 encoding for Windows compatibility
+                return HTMLResponse(content=index_path.read_text(encoding="utf-8"), status_code=200)
             raise HTTPException(status_code=404, detail="index.html not found")
 
         # Mount static files for assets (logo, etc.)
