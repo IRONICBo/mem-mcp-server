@@ -86,11 +86,29 @@ class UIManager:
             return False
 
     @staticmethod
-    def start(project_path: str, port: int = 38888, host: str = "127.0.0.1") -> tuple[bool, str]:
+    def find_available_port(
+        start_port: int = 38888, host: str = "127.0.0.1", max_attempts: int = 10
+    ) -> int:
+        """Find an available port starting from start_port."""
+        for i in range(max_attempts):
+            port = start_port + i
+            if not UIManager.is_port_in_use(port, host):
+                return port
+        raise RuntimeError(
+            f"No available port found in range {start_port}-{start_port + max_attempts - 1}"
+        )
+
+    @staticmethod
+    def start(project_path: str, port: int = 0, host: str = "127.0.0.1") -> tuple[bool, str]:
         """Start UI server for a project in background.
 
+        Args:
+            project_path: Path to the project directory
+            port: Port number (0 = auto-select starting from 38888)
+            host: Host to bind to
+
         Returns:
-            (success, message) tuple
+            (success, message) tuple - message contains URL on success
         """
         project_path = UIManager._normalize_path(project_path)
 
@@ -103,16 +121,18 @@ class UIManager:
         if project_path in servers:
             info = servers[project_path]
             if UIManager.is_process_running(info["pid"]):
-                return False, (
-                    f"Server already running for {project_path}\n"
-                    f"  URL: http://{info['host']}:{info['port']}\n"
-                    f"  PID: {info['pid']}"
-                )
+                # Return existing server info as success
+                return True, f"http://{info['host']}:{info['port']}"
             # Clean up stale entry
             del servers[project_path]
 
-        # Check if port is in use
-        if UIManager.is_port_in_use(port, host):
+        # Find available port (auto-select if port=0)
+        if port == 0:
+            try:
+                port = UIManager.find_available_port(38888, host)
+            except RuntimeError as e:
+                return False, str(e)
+        elif UIManager.is_port_in_use(port, host):
             return False, f"Port {port} is already in use"
 
         # Start server in background
@@ -200,13 +220,36 @@ class UIManager:
 
         try:
             process = psutil.Process(pid)
-            # Terminate gracefully
+
+            # Kill all child processes first (uvicorn spawns workers)
+            children = process.children(recursive=True)
+            for child in children:
+                try:
+                    child.terminate()
+                except psutil.NoSuchProcess:
+                    pass
+
+            # Terminate the main process
             process.terminate()
+
+            # Wait for children to exit
+            gone, alive = psutil.wait_procs(children, timeout=2)
+            for p in alive:
+                try:
+                    p.kill()
+                except psutil.NoSuchProcess:
+                    pass
+
+            # Wait for main process
             try:
-                process.wait(timeout=5)
+                process.wait(timeout=3)
             except psutil.TimeoutExpired:
                 process.kill()
-                process.wait(timeout=2)
+                try:
+                    process.wait(timeout=2)
+                except psutil.TimeoutExpired:
+                    # Force cleanup even if process didn't exit
+                    pass
 
             # Remove from registry
             del servers[project_path]
@@ -218,6 +261,10 @@ class UIManager:
             UIManager.save_servers(servers)
             return True, "Server was not running"
         except Exception as e:
+            # Still clean up registry on error
+            if project_path in servers:
+                del servers[project_path]
+                UIManager.save_servers(servers)
             return False, f"Failed to stop server: {e}"
 
     @staticmethod

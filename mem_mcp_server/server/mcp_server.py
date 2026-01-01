@@ -514,7 +514,7 @@ class MemMCPTools:
 
     @staticmethod
     @mcp.tool()
-    def mem_ui(port: int = 38888) -> str:
+    def mem_ui(port: int = 0) -> str:
         """Open the MemoV Web UI to visually browse your AI coding history.
 
         **Purpose:**
@@ -531,14 +531,12 @@ class MemMCPTools:
         - Before jumping to a previous state
 
         Args:
-            port: Port number for the web server (default: 38888)
+            port: Port number for the web server (default: auto-select starting from 38888)
 
         Returns:
             URL to open in browser
         """
-        import subprocess
-        import sys
-        import time
+        from memov.web.manager import UIManager
 
         try:
             LOGGER.info(f"mem_ui called with port={port}")
@@ -549,47 +547,14 @@ class MemMCPTools:
             if not os.path.exists(MemMCPTools._project_path):
                 raise ValueError(f"Project path '{MemMCPTools._project_path}' does not exist.")
 
-            memov_manager = MemovManager(project_path=MemMCPTools._project_path)
+            # Use UIManager to start server (handles registration, port selection, etc.)
+            success, message = UIManager.start(MemMCPTools._project_path, port=port)
 
-            if (check_status := memov_manager.check()) is not MemStatus.SUCCESS:
-                return f"[ERROR] Memov not initialized: {check_status}. Run 'mem init' first."
+            if not success:
+                return f"[ERROR] {message}"
 
-            # Start the web server in background
-            url = f"http://localhost:{port}"
-
-            # Use subprocess to start the web server
-            # Use repr() to properly escape the path (handles Windows backslashes)
-            escaped_path = repr(MemMCPTools._project_path)
-            cmd = [
-                sys.executable,
-                "-c",
-                f"from memov.web.server import start_server; start_server({escaped_path}, port={port})",
-            ]
-
-            # Platform-specific subprocess options for background process
-            import platform
-
-            if platform.system() == "Windows":
-                # Windows: use CREATE_NEW_PROCESS_GROUP and DETACHED_PROCESS
-                creationflags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS
-                subprocess.Popen(
-                    cmd,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                    stdin=subprocess.DEVNULL,
-                    creationflags=creationflags,
-                )
-            else:
-                # Unix: use start_new_session
-                subprocess.Popen(
-                    cmd,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                    start_new_session=True,
-                )
-
-            # Give it a moment to start
-            time.sleep(1)
+            # message contains the URL on success
+            url = message
 
             lines = []
             lines.append("[SUCCESS] MemoV Web UI started!")
@@ -602,7 +567,7 @@ class MemMCPTools:
             lines.append("  • Click any file to view its diff")
             lines.append("  • Jump to any snapshot with one click")
             lines.append("")
-            lines.append("The server runs in background. Close the terminal to stop it.")
+            lines.append("Use 'mem ui status' to check, 'mem ui stop' to stop.")
 
             return "\n".join(lines)
 

@@ -53,7 +53,8 @@ def create_app(project_path: str) -> "FastAPI":
         """Get all branches and current branch."""
         manager = MemovManager(project_path=_project_path)
         if manager.check() is not MemStatus.SUCCESS:
-            raise HTTPException(status_code=400, detail="Memov not initialized")
+            # Return empty data instead of error - let frontend show "not initialized" UI
+            return {"current": None, "branches": {}}
 
         branches = manager._load_branches()
         if branches is None:
@@ -65,7 +66,8 @@ def create_app(project_path: str) -> "FastAPI":
         """Get commit graph data for visualization."""
         manager = MemovManager(project_path=_project_path)
         if manager.check() is not MemStatus.SUCCESS:
-            raise HTTPException(status_code=400, detail="Memov not initialized")
+            # Return empty graph instead of error - let frontend show "not initialized" UI
+            return {"nodes": [], "edges": [], "jump_edges": [], "current_branch": None}
 
         history = manager.get_history(limit=100)
         branches = manager._load_branches()
