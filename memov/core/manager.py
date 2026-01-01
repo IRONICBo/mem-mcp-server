@@ -16,7 +16,7 @@ from memov.core.git import GitManager
 from memov.storage import CHROMADB_AVAILABLE
 from memov.storage.vectordb import VectorDB
 from memov.utils.print_utils import Color
-from memov.utils.string_utils import short_msg
+from memov.utils.string_utils import short_msg, split_path_parts
 
 LOGGER = logging.getLogger(__name__)
 
@@ -254,7 +254,7 @@ class MemovManager:
                     abs_resolved = (Path(self.project_path) / rel_path).resolve()
                     blob_hash = head_file_blobs.get(abs_resolved)
                     if blob_hash:
-                        parts = rel_path.split("/")
+                        parts = split_path_parts(rel_path)
                         current = tree_structure
                         for part in parts[:-1]:
                             if part not in current:
@@ -273,7 +273,7 @@ class MemovManager:
                         LOGGER.error(f"Failed to create blob for {rel_path}")
                         return MemStatus.UNKNOWN_ERROR
 
-                    parts = rel_path.split("/")
+                    parts = split_path_parts(rel_path)
                     current = tree_structure
                     for part in parts[:-1]:
                         if part not in current:
@@ -464,7 +464,7 @@ class MemovManager:
                         return MemStatus.UNKNOWN_ERROR
 
                     # Build tree structure
-                    parts = rel_path.split("/")
+                    parts = split_path_parts(rel_path)
                     current = tree_structure
                     for part in parts[:-1]:
                         if part not in current:

@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 from typing import Optional
 
-from memov.utils.string_utils import clean_windows_git_lstree_output
+from memov.utils.string_utils import clean_windows_git_lstree_output, split_path_parts
 
 LOGGER = logging.getLogger(__name__)
 
@@ -103,9 +103,11 @@ class GitManager:
         if success and output.stdout:
             file_rel_paths = []
             file_abs_paths = []
+            # repo_path is .mem/memov.git, project root is two levels up
+            project_root = Path(repo_path).parent.parent
             for rel_file in output.stdout.strip().splitlines():
                 rel_file = clean_windows_git_lstree_output(rel_file)
-                abs_file_path = os.path.join(repo_path, "..", "..", rel_file)
+                abs_file_path = str((project_root / rel_file).resolve())
                 file_rel_paths.append(rel_file)
                 file_abs_paths.append(abs_file_path)
 
@@ -272,8 +274,8 @@ class GitManager:
                 LOGGER.error(f"Failed to create blob for {rel_file}")
                 return ""
 
-            # Split path into parts
-            parts = rel_file.split("/")
+            # Split path into parts (cross-platform compatible)
+            parts = split_path_parts(rel_file)
             current = tree_structure
 
             # Navigate/create nested structure
