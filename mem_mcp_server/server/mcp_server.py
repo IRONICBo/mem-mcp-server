@@ -217,23 +217,38 @@ class MemMCPTools:
 
             # Step 2: Handle two cases - with or without file changes
             if not files_changed or files_changed.strip() == "":
-                # Case 1: No file changes - just record the interaction without snapshotting files
-                # We don't call snapshot() here because that would commit all tracked files,
-                # including any manual changes the user made
-                LOGGER.info("No files changed, skipping snapshot (prompt-only interaction)")
+                # Case 1: No file changes - create a prompt-only commit
+                # This creates an "empty commit" with the same tree as HEAD
+                LOGGER.info("No files changed, creating prompt-only commit")
 
-                # TODO: In the future, we could record prompt-only interactions using git notes
-                # or a separate metadata system, without creating commits
+                status, commit_hash = memov_manager.create_prompt_only_commit(
+                    prompt=user_prompt,
+                    response=original_response,
+                    agent_plan=agent_plan_str,
+                    by_user=False,
+                )
 
-                result_parts = [
-                    "[SUCCESS] Interaction recorded (no file changes, no snapshot created)"
-                ]
+                if status is not MemStatus.SUCCESS or not commit_hash:
+                    # If no HEAD exists yet (nothing tracked), just log and return success
+                    # This is expected when memov is initialized but no files are tracked yet
+                    result_parts = [
+                        "[SUCCESS] Interaction recorded (no tracked files yet, no commit created)"
+                    ]
+                    result_parts.append(f"Prompt: {user_prompt}")
+                    result_parts.append(f"Response: {len(original_response)} characters")
+                    if agent_plan_str:
+                        result_parts.append(f"Agent plan: {len(agent_plan_str)} characters")
+                    result = "\n".join(result_parts)
+                    LOGGER.info(f"Interaction recorded (no tracked files): {result}")
+                    return result
+
+                result_parts = [f"[SUCCESS] Interaction recorded as commit {commit_hash[:7]}"]
                 result_parts.append(f"Prompt: {user_prompt}")
                 result_parts.append(f"Response: {len(original_response)} characters")
                 if agent_plan_str:
                     result_parts.append(f"Agent plan: {len(agent_plan_str)} characters")
                 result = "\n".join(result_parts)
-                LOGGER.info(f"Interaction recorded successfully: {result}")
+                LOGGER.info(f"Prompt-only commit created: {result}")
                 return result
 
             else:

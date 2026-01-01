@@ -486,6 +486,86 @@ class MemovManager:
             LOGGER.error(f"Error creating snapshot in memov repo: {e}")
             return MemStatus.UNKNOWN_ERROR
 
+    def create_prompt_only_commit(
+        self,
+        prompt: Optional[str] = None,
+        response: Optional[str] = None,
+        agent_plan: Optional[str] = None,
+        by_user: bool = False,
+    ) -> tuple[MemStatus, str]:
+        """Create a commit for prompt-only interactions (no file changes).
+
+        This creates an "empty commit" using the same tree as HEAD, allowing
+        prompt/response interactions to be recorded even when no files change.
+
+        Args:
+            prompt: The user prompt
+            response: The AI response
+            agent_plan: Optional agent plan
+            by_user: Whether initiated by user
+
+        Returns:
+            Tuple of (MemStatus, commit_hash)
+        """
+        try:
+            # Check if we're on a branch
+            branches = self._load_branches()
+            if branches and branches.get("current") is None:
+                LOGGER.error("Not on any branch.")
+                return MemStatus.UNKNOWN_ERROR, ""
+
+            # Get current HEAD commit
+            head_commit = GitManager.get_commit_id_by_ref(
+                self.bare_repo_path, "refs/memov/HEAD", verbose=False
+            )
+            if not head_commit:
+                LOGGER.error("No HEAD commit found. Track some files first.")
+                return MemStatus.UNKNOWN_ERROR, ""
+
+            # Get the tree hash from HEAD
+            tree_hash = GitManager.get_tree_hash(self.bare_repo_path, head_commit)
+            if not tree_hash:
+                LOGGER.error("Failed to get tree hash from HEAD")
+                return MemStatus.UNKNOWN_ERROR, ""
+
+            # Create commit message with [prompt-only] marker
+            commit_msg = "[prompt-only] Record interaction\n\n"
+            commit_msg += f"Prompt: {prompt}\nResponse: {response}\nAgent Plan: {agent_plan}\nSource: {'User' if by_user else 'AI'}"
+
+            # Create new commit with same tree but different parent
+            commit_hash = GitManager.commit_tree(
+                self.bare_repo_path, tree_hash, commit_msg, head_commit
+            )
+
+            if not commit_hash:
+                LOGGER.error("Failed to create prompt-only commit")
+                return MemStatus.FAILED_TO_COMMIT, ""
+
+            # Update branch
+            self._validate_and_fix_branches()
+            GitManager.ensure_git_user_config(
+                self.bare_repo_path, self.default_name, self.default_email
+            )
+            self._update_branch(commit_hash)
+
+            # Add to pending writes for VectorDB sync
+            self._add_to_pending_writes(
+                operation_type="prompt-only",
+                commit_hash=commit_hash,
+                prompt=prompt,
+                response=response,
+                agent_plan=agent_plan,
+                by_user=by_user,
+                files=[],
+            )
+
+            LOGGER.info(f"Prompt-only commit created: {commit_hash[:7]}")
+            return MemStatus.SUCCESS, commit_hash
+
+        except Exception as e:
+            LOGGER.error(f"Error creating prompt-only commit: {e}")
+            return MemStatus.UNKNOWN_ERROR, ""
+
     def rename(
         self,
         old_file_path: str,
@@ -1683,7 +1763,9 @@ class MemovManager:
 
         first_line = commit_message.splitlines()[0].lower()
 
-        if "track" in first_line:
+        if "[prompt-only]" in first_line:
+            return "prompt-only"
+        elif "track" in first_line:
             return "track"
         elif "snapshot" in first_line or "snap" in first_line:
             return "snap"
