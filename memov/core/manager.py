@@ -762,27 +762,22 @@ class MemovManager:
                     message = GitManager.get_commit_message(self.bare_repo_path, hash_id)
                     operation_type = self._extract_operation_type(message)
 
-                    # Get prompt, response, agent_plan from commit message first
-                    prompt = response = agent_plan = ""
-                    for line in message.splitlines():
-                        if line.startswith("Prompt:"):
-                            prompt = line[len("Prompt:") :].strip()
-                        elif line.startswith("Response:"):
-                            response = line[len("Response:") :].strip()
-                        elif line.startswith("Agent Plan:"):
-                            agent_plan = line[len("Agent Plan:") :].strip()
+                    # Parse prompt, response, agent_plan from commit message (multi-line aware)
+                    parsed = self._parse_note_content(message)
+                    prompt = parsed["prompt"]
+                    response = parsed["response"]
+                    agent_plan = parsed["agent_plan"]
 
                     # Check if there's a git note for this commit (priority over commit message)
                     note_content = GitManager.get_commit_note(self.bare_repo_path, hash_id)
                     if note_content:
-                        # Parse the note content for updated prompt/response/agent_plan
-                        for line in note_content.splitlines():
-                            if line.startswith("Prompt:"):
-                                prompt = line[len("Prompt:") :].strip()
-                            elif line.startswith("Response:"):
-                                response = line[len("Response:") :].strip()
-                            elif line.startswith("Agent Plan:"):
-                                agent_plan = line[len("Agent Plan:") :].strip()
+                        note_parsed = self._parse_note_content(note_content)
+                        if note_parsed["prompt"]:
+                            prompt = note_parsed["prompt"]
+                        if note_parsed["response"]:
+                            response = note_parsed["response"]
+                        if note_parsed["agent_plan"]:
+                            agent_plan = note_parsed["agent_plan"]
 
                     # Get the branch marker and format the output
                     marker = "*" if hash_id == head_commit else " "
@@ -861,26 +856,22 @@ class MemovManager:
                 message = GitManager.get_commit_message(self.bare_repo_path, hash_id)
                 operation_type = self._extract_operation_type(message)
 
-                # Parse prompt, response, agent_plan from commit message
-                prompt = response = agent_plan = ""
-                for line in message.splitlines():
-                    if line.startswith("Prompt:"):
-                        prompt = line[len("Prompt:") :].strip()
-                    elif line.startswith("Response:"):
-                        response = line[len("Response:") :].strip()
-                    elif line.startswith("Agent Plan:"):
-                        agent_plan = line[len("Agent Plan:") :].strip()
+                # Parse prompt, response, agent_plan from commit message (multi-line aware)
+                parsed = self._parse_note_content(message)
+                prompt = parsed["prompt"]
+                response = parsed["response"]
+                agent_plan = parsed["agent_plan"]
 
                 # Check if there's a git note for this commit (priority over commit message)
                 note_content = GitManager.get_commit_note(self.bare_repo_path, hash_id)
                 if note_content:
-                    for line in note_content.splitlines():
-                        if line.startswith("Prompt:"):
-                            prompt = line[len("Prompt:") :].strip()
-                        elif line.startswith("Response:"):
-                            response = line[len("Response:") :].strip()
-                        elif line.startswith("Agent Plan:"):
-                            agent_plan = line[len("Agent Plan:") :].strip()
+                    note_parsed = self._parse_note_content(note_content)
+                    if note_parsed["prompt"]:
+                        prompt = note_parsed["prompt"]
+                    if note_parsed["response"]:
+                        response = note_parsed["response"]
+                    if note_parsed["agent_plan"]:
+                        agent_plan = note_parsed["agent_plan"]
 
                 # Get files in this commit
                 file_rel_paths, _ = GitManager.get_files_by_commit(self.bare_repo_path, hash_id)
@@ -1775,6 +1766,48 @@ class MemovManager:
             return "remove"
         else:
             return "unknown"
+
+    def _parse_note_content(self, content: str) -> dict[str, str]:
+        """Parse multi-line content with Prompt:/Response:/Agent Plan: labels.
+
+        Args:
+            content: The commit message or git note content to parse.
+
+        Returns:
+            Dict with keys 'prompt', 'response', 'agent_plan' containing full multi-line values.
+        """
+        result = {"prompt": "", "response": "", "agent_plan": ""}
+        if not content:
+            return result
+
+        lines = content.splitlines()
+        current_key = None
+        current_lines = []
+        labels = {"Prompt:": "prompt", "Response:": "response", "Agent Plan:": "agent_plan"}
+
+        for line in lines:
+            # Check if line starts with any label
+            found_label = None
+            for label, key in labels.items():
+                if line.startswith(label):
+                    found_label = label
+                    # Save previous section if any
+                    if current_key is not None:
+                        result[current_key] = "\n".join(current_lines).strip()
+                    # Start new section
+                    current_key = key
+                    current_lines = [line[len(label) :].strip()]
+                    break
+
+            if found_label is None and current_key is not None:
+                # Continue collecting lines for current section
+                current_lines.append(line)
+
+        # Save last section
+        if current_key is not None:
+            result[current_key] = "\n".join(current_lines).strip()
+
+        return result
 
     def _load_pending_writes(self) -> list[dict]:
         """Load pending writes from disk if exists."""
