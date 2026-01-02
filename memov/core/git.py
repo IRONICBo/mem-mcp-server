@@ -81,6 +81,20 @@ class GitManager:
             return ""
 
     @staticmethod
+    def get_tree_hash(repo_path: str, commit_id: str) -> str:
+        """Get the tree hash for a specific commit."""
+        command = ["git", f"--git-dir={repo_path}", "rev-parse", f"{commit_id}^{{tree}}"]
+        success, output = subprocess_call(command=command)
+
+        if success and output:
+            return output.stdout.strip()
+        else:
+            LOGGER.error(
+                f"Failed to get tree hash for commit {commit_id} in repository at {repo_path}"
+            )
+            return ""
+
+    @staticmethod
     def get_files_by_commit(repo_path: str, commit_id: str) -> tuple[list[str], list[str]]:
         """Get the list of files in a specific commit."""
         command = ["git", f"--git-dir={repo_path}", "ls-tree", "-r", "--name-only", commit_id]

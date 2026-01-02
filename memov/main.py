@@ -591,21 +591,30 @@ def _ui_start(loc: str, port: int, foreground: bool) -> None:
 
 
 @ui_app.command("status")
-def ui_status(loc: LocOption = ".") -> None:
+def ui_status(
+    loc: Annotated[
+        Optional[str],
+        typer.Option("--loc", help="Specify the project directory path (default: show all)"),
+    ] = None,
+) -> None:
     """Show status of the Web UI server.
 
     Examples:
-        mem ui status
-        mem ui status --loc /path/to/project
+        mem ui status              # Show all running servers
+        mem ui status --loc .      # Show server for current directory
+        mem ui status --loc /path  # Show server for specific project
     """
     from memov.web.manager import UIManager
 
-    project_path = os.path.abspath(loc)
+    project_path = os.path.abspath(loc) if loc else None
     servers = UIManager.status(project_path)
     console = get_console()
 
     if not servers:
-        console.print(f"[yellow]No server running for {project_path}[/yellow]")
+        if project_path:
+            console.print(f"[yellow]No server running for {project_path}[/yellow]")
+        else:
+            console.print("[yellow]No MemoV Web UI servers running[/yellow]")
         return
 
     for server in servers:
@@ -620,18 +629,44 @@ def ui_status(loc: LocOption = ".") -> None:
 
 
 @ui_app.command("stop")
-def ui_stop(loc: LocOption = ".") -> None:
+def ui_stop(
+    loc: Annotated[
+        Optional[str],
+        typer.Option("--loc", help="Specify the project directory path"),
+    ] = None,
+) -> None:
     """Stop the Web UI server.
 
     Examples:
-        mem ui stop
-        mem ui stop --loc /path/to/project
+        mem ui stop              # Stop if only one server running
+        mem ui stop --loc .      # Stop server for current directory
+        mem ui stop --loc /path  # Stop server for specific project
     """
     from memov.web.manager import UIManager
 
-    project_path = os.path.abspath(loc)
     console = get_console()
-    console.print(f"[blue]Stopping MemoV Web UI...[/blue]")
+
+    if loc is None:
+        # No --loc provided: auto-detect
+        servers = UIManager.status(None)
+        if not servers:
+            console.print("[yellow]No MemoV Web UI servers running[/yellow]")
+            return
+        if len(servers) == 1:
+            # Only one server, stop it
+            project_path = servers[0]["project_path"]
+            console.print(f"[blue]Stopping MemoV Web UI for {project_path}...[/blue]")
+        else:
+            # Multiple servers, ask user to specify
+            console.print(
+                "[yellow]Multiple servers running. Use --loc to specify which one:[/yellow]"
+            )
+            for s in servers:
+                console.print(f"  • {s['project_path']} (port {s['port']})")
+            return
+    else:
+        project_path = os.path.abspath(loc)
+        console.print(f"[blue]Stopping MemoV Web UI...[/blue]")
 
     success, message = UIManager.stop(project_path)
 

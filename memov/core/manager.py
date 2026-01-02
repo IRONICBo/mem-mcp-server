@@ -486,6 +486,86 @@ class MemovManager:
             LOGGER.error(f"Error creating snapshot in memov repo: {e}")
             return MemStatus.UNKNOWN_ERROR
 
+    def create_prompt_only_commit(
+        self,
+        prompt: Optional[str] = None,
+        response: Optional[str] = None,
+        agent_plan: Optional[str] = None,
+        by_user: bool = False,
+    ) -> tuple[MemStatus, str]:
+        """Create a commit for prompt-only interactions (no file changes).
+
+        This creates an "empty commit" using the same tree as HEAD, allowing
+        prompt/response interactions to be recorded even when no files change.
+
+        Args:
+            prompt: The user prompt
+            response: The AI response
+            agent_plan: Optional agent plan
+            by_user: Whether initiated by user
+
+        Returns:
+            Tuple of (MemStatus, commit_hash)
+        """
+        try:
+            # Check if we're on a branch
+            branches = self._load_branches()
+            if branches and branches.get("current") is None:
+                LOGGER.error("Not on any branch.")
+                return MemStatus.UNKNOWN_ERROR, ""
+
+            # Get current HEAD commit
+            head_commit = GitManager.get_commit_id_by_ref(
+                self.bare_repo_path, "refs/memov/HEAD", verbose=False
+            )
+            if not head_commit:
+                LOGGER.error("No HEAD commit found. Track some files first.")
+                return MemStatus.UNKNOWN_ERROR, ""
+
+            # Get the tree hash from HEAD
+            tree_hash = GitManager.get_tree_hash(self.bare_repo_path, head_commit)
+            if not tree_hash:
+                LOGGER.error("Failed to get tree hash from HEAD")
+                return MemStatus.UNKNOWN_ERROR, ""
+
+            # Create commit message with [prompt-only] marker
+            commit_msg = "[prompt-only] Record interaction\n\n"
+            commit_msg += f"Prompt: {prompt}\nResponse: {response}\nAgent Plan: {agent_plan}\nSource: {'User' if by_user else 'AI'}"
+
+            # Create new commit with same tree but different parent
+            commit_hash = GitManager.commit_tree(
+                self.bare_repo_path, tree_hash, commit_msg, head_commit
+            )
+
+            if not commit_hash:
+                LOGGER.error("Failed to create prompt-only commit")
+                return MemStatus.FAILED_TO_COMMIT, ""
+
+            # Update branch
+            self._validate_and_fix_branches()
+            GitManager.ensure_git_user_config(
+                self.bare_repo_path, self.default_name, self.default_email
+            )
+            self._update_branch(commit_hash)
+
+            # Add to pending writes for VectorDB sync
+            self._add_to_pending_writes(
+                operation_type="prompt-only",
+                commit_hash=commit_hash,
+                prompt=prompt,
+                response=response,
+                agent_plan=agent_plan,
+                by_user=by_user,
+                files=[],
+            )
+
+            LOGGER.info(f"Prompt-only commit created: {commit_hash[:7]}")
+            return MemStatus.SUCCESS, commit_hash
+
+        except Exception as e:
+            LOGGER.error(f"Error creating prompt-only commit: {e}")
+            return MemStatus.UNKNOWN_ERROR, ""
+
     def rename(
         self,
         old_file_path: str,
@@ -682,27 +762,22 @@ class MemovManager:
                     message = GitManager.get_commit_message(self.bare_repo_path, hash_id)
                     operation_type = self._extract_operation_type(message)
 
-                    # Get prompt, response, agent_plan from commit message first
-                    prompt = response = agent_plan = ""
-                    for line in message.splitlines():
-                        if line.startswith("Prompt:"):
-                            prompt = line[len("Prompt:") :].strip()
-                        elif line.startswith("Response:"):
-                            response = line[len("Response:") :].strip()
-                        elif line.startswith("Agent Plan:"):
-                            agent_plan = line[len("Agent Plan:") :].strip()
+                    # Parse prompt, response, agent_plan from commit message (multi-line aware)
+                    parsed = self._parse_note_content(message)
+                    prompt = parsed["prompt"]
+                    response = parsed["response"]
+                    agent_plan = parsed["agent_plan"]
 
                     # Check if there's a git note for this commit (priority over commit message)
                     note_content = GitManager.get_commit_note(self.bare_repo_path, hash_id)
                     if note_content:
-                        # Parse the note content for updated prompt/response/agent_plan
-                        for line in note_content.splitlines():
-                            if line.startswith("Prompt:"):
-                                prompt = line[len("Prompt:") :].strip()
-                            elif line.startswith("Response:"):
-                                response = line[len("Response:") :].strip()
-                            elif line.startswith("Agent Plan:"):
-                                agent_plan = line[len("Agent Plan:") :].strip()
+                        note_parsed = self._parse_note_content(note_content)
+                        if note_parsed["prompt"]:
+                            prompt = note_parsed["prompt"]
+                        if note_parsed["response"]:
+                            response = note_parsed["response"]
+                        if note_parsed["agent_plan"]:
+                            agent_plan = note_parsed["agent_plan"]
 
                     # Get the branch marker and format the output
                     marker = "*" if hash_id == head_commit else " "
@@ -781,26 +856,22 @@ class MemovManager:
                 message = GitManager.get_commit_message(self.bare_repo_path, hash_id)
                 operation_type = self._extract_operation_type(message)
 
-                # Parse prompt, response, agent_plan from commit message
-                prompt = response = agent_plan = ""
-                for line in message.splitlines():
-                    if line.startswith("Prompt:"):
-                        prompt = line[len("Prompt:") :].strip()
-                    elif line.startswith("Response:"):
-                        response = line[len("Response:") :].strip()
-                    elif line.startswith("Agent Plan:"):
-                        agent_plan = line[len("Agent Plan:") :].strip()
+                # Parse prompt, response, agent_plan from commit message (multi-line aware)
+                parsed = self._parse_note_content(message)
+                prompt = parsed["prompt"]
+                response = parsed["response"]
+                agent_plan = parsed["agent_plan"]
 
                 # Check if there's a git note for this commit (priority over commit message)
                 note_content = GitManager.get_commit_note(self.bare_repo_path, hash_id)
                 if note_content:
-                    for line in note_content.splitlines():
-                        if line.startswith("Prompt:"):
-                            prompt = line[len("Prompt:") :].strip()
-                        elif line.startswith("Response:"):
-                            response = line[len("Response:") :].strip()
-                        elif line.startswith("Agent Plan:"):
-                            agent_plan = line[len("Agent Plan:") :].strip()
+                    note_parsed = self._parse_note_content(note_content)
+                    if note_parsed["prompt"]:
+                        prompt = note_parsed["prompt"]
+                    if note_parsed["response"]:
+                        response = note_parsed["response"]
+                    if note_parsed["agent_plan"]:
+                        agent_plan = note_parsed["agent_plan"]
 
                 # Get files in this commit
                 file_rel_paths, _ = GitManager.get_files_by_commit(self.bare_repo_path, hash_id)
@@ -1683,7 +1754,9 @@ class MemovManager:
 
         first_line = commit_message.splitlines()[0].lower()
 
-        if "track" in first_line:
+        if "[prompt-only]" in first_line:
+            return "prompt-only"
+        elif "track" in first_line:
             return "track"
         elif "snapshot" in first_line or "snap" in first_line:
             return "snap"
@@ -1693,6 +1766,48 @@ class MemovManager:
             return "remove"
         else:
             return "unknown"
+
+    def _parse_note_content(self, content: str) -> dict[str, str]:
+        """Parse multi-line content with Prompt:/Response:/Agent Plan: labels.
+
+        Args:
+            content: The commit message or git note content to parse.
+
+        Returns:
+            Dict with keys 'prompt', 'response', 'agent_plan' containing full multi-line values.
+        """
+        result = {"prompt": "", "response": "", "agent_plan": ""}
+        if not content:
+            return result
+
+        lines = content.splitlines()
+        current_key = None
+        current_lines = []
+        labels = {"Prompt:": "prompt", "Response:": "response", "Agent Plan:": "agent_plan"}
+
+        for line in lines:
+            # Check if line starts with any label
+            found_label = None
+            for label, key in labels.items():
+                if line.startswith(label):
+                    found_label = label
+                    # Save previous section if any
+                    if current_key is not None:
+                        result[current_key] = "\n".join(current_lines).strip()
+                    # Start new section
+                    current_key = key
+                    current_lines = [line[len(label) :].strip()]
+                    break
+
+            if found_label is None and current_key is not None:
+                # Continue collecting lines for current section
+                current_lines.append(line)
+
+        # Save last section
+        if current_key is not None:
+            result[current_key] = "\n".join(current_lines).strip()
+
+        return result
 
     def _load_pending_writes(self) -> list[dict]:
         """Load pending writes from disk if exists."""

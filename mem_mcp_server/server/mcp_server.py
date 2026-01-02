@@ -217,23 +217,38 @@ class MemMCPTools:
 
             # Step 2: Handle two cases - with or without file changes
             if not files_changed or files_changed.strip() == "":
-                # Case 1: No file changes - just record the interaction without snapshotting files
-                # We don't call snapshot() here because that would commit all tracked files,
-                # including any manual changes the user made
-                LOGGER.info("No files changed, skipping snapshot (prompt-only interaction)")
+                # Case 1: No file changes - create a prompt-only commit
+                # This creates an "empty commit" with the same tree as HEAD
+                LOGGER.info("No files changed, creating prompt-only commit")
 
-                # TODO: In the future, we could record prompt-only interactions using git notes
-                # or a separate metadata system, without creating commits
+                status, commit_hash = memov_manager.create_prompt_only_commit(
+                    prompt=user_prompt,
+                    response=original_response,
+                    agent_plan=agent_plan_str,
+                    by_user=False,
+                )
 
-                result_parts = [
-                    "[SUCCESS] Interaction recorded (no file changes, no snapshot created)"
-                ]
+                if status is not MemStatus.SUCCESS or not commit_hash:
+                    # If no HEAD exists yet (nothing tracked), just log and return success
+                    # This is expected when memov is initialized but no files are tracked yet
+                    result_parts = [
+                        "[SUCCESS] Interaction recorded (no tracked files yet, no commit created)"
+                    ]
+                    result_parts.append(f"Prompt: {user_prompt}")
+                    result_parts.append(f"Response: {len(original_response)} characters")
+                    if agent_plan_str:
+                        result_parts.append(f"Agent plan: {len(agent_plan_str)} characters")
+                    result = "\n".join(result_parts)
+                    LOGGER.info(f"Interaction recorded (no tracked files): {result}")
+                    return result
+
+                result_parts = [f"[SUCCESS] Interaction recorded as commit {commit_hash[:7]}"]
                 result_parts.append(f"Prompt: {user_prompt}")
                 result_parts.append(f"Response: {len(original_response)} characters")
                 if agent_plan_str:
                     result_parts.append(f"Agent plan: {len(agent_plan_str)} characters")
                 result = "\n".join(result_parts)
-                LOGGER.info(f"Interaction recorded successfully: {result}")
+                LOGGER.info(f"Prompt-only commit created: {result}")
                 return result
 
             else:
@@ -514,7 +529,7 @@ class MemMCPTools:
 
     @staticmethod
     @mcp.tool()
-    def mem_ui(port: int = 38888) -> str:
+    def mem_ui(port: int = 0) -> str:
         """Open the MemoV Web UI to visually browse your AI coding history.
 
         **Purpose:**
@@ -531,14 +546,12 @@ class MemMCPTools:
         - Before jumping to a previous state
 
         Args:
-            port: Port number for the web server (default: 38888)
+            port: Port number for the web server (default: auto-select starting from 38888)
 
         Returns:
             URL to open in browser
         """
-        import subprocess
-        import sys
-        import time
+        from memov.web.manager import UIManager
 
         try:
             LOGGER.info(f"mem_ui called with port={port}")
@@ -549,47 +562,14 @@ class MemMCPTools:
             if not os.path.exists(MemMCPTools._project_path):
                 raise ValueError(f"Project path '{MemMCPTools._project_path}' does not exist.")
 
-            memov_manager = MemovManager(project_path=MemMCPTools._project_path)
+            # Use UIManager to start server (handles registration, port selection, etc.)
+            success, message = UIManager.start(MemMCPTools._project_path, port=port)
 
-            if (check_status := memov_manager.check()) is not MemStatus.SUCCESS:
-                return f"[ERROR] Memov not initialized: {check_status}. Run 'mem init' first."
+            if not success:
+                return f"[ERROR] {message}"
 
-            # Start the web server in background
-            url = f"http://localhost:{port}"
-
-            # Use subprocess to start the web server
-            # Use repr() to properly escape the path (handles Windows backslashes)
-            escaped_path = repr(MemMCPTools._project_path)
-            cmd = [
-                sys.executable,
-                "-c",
-                f"from memov.web.server import start_server; start_server({escaped_path}, port={port})",
-            ]
-
-            # Platform-specific subprocess options for background process
-            import platform
-
-            if platform.system() == "Windows":
-                # Windows: use CREATE_NEW_PROCESS_GROUP and DETACHED_PROCESS
-                creationflags = subprocess.CREATE_NEW_PROCESS_GROUP | subprocess.DETACHED_PROCESS
-                subprocess.Popen(
-                    cmd,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                    stdin=subprocess.DEVNULL,
-                    creationflags=creationflags,
-                )
-            else:
-                # Unix: use start_new_session
-                subprocess.Popen(
-                    cmd,
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                    start_new_session=True,
-                )
-
-            # Give it a moment to start
-            time.sleep(1)
+            # message contains the URL on success
+            url = message
 
             lines = []
             lines.append("[SUCCESS] MemoV Web UI started!")
@@ -602,7 +582,7 @@ class MemMCPTools:
             lines.append("  • Click any file to view its diff")
             lines.append("  • Jump to any snapshot with one click")
             lines.append("")
-            lines.append("The server runs in background. Close the terminal to stop it.")
+            lines.append("Use 'mem ui status' to check, 'mem ui stop' to stop.")
 
             return "\n".join(lines)
 
