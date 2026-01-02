@@ -16,7 +16,7 @@ from memov.core.git import GitManager
 from memov.storage import CHROMADB_AVAILABLE
 from memov.storage.vectordb import VectorDB
 from memov.utils.print_utils import Color
-from memov.utils.string_utils import short_msg, split_path_parts
+from memov.utils.string_utils import normalize_path_separator, short_msg, split_path_parts
 
 LOGGER = logging.getLogger(__name__)
 
@@ -634,7 +634,10 @@ class MemovManager:
         try:
             old_abs_path = os.path.abspath(old_file_path)
             new_abs_path = os.path.abspath(new_file_path)
-            old_rel_path = os.path.relpath(old_abs_path, self.project_path)
+            # Normalize path separator for cross-platform compatibility
+            old_rel_path = normalize_path_separator(
+                os.path.relpath(old_abs_path, self.project_path)
+            )
             old_file_existed = os.path.exists(old_abs_path)
             new_file_existed = os.path.exists(new_abs_path)
 
@@ -682,7 +685,10 @@ class MemovManager:
 
             # Add to pending writes (will be synced later via mem sync)
             if commit_hash:
-                new_rel_path = os.path.relpath(new_abs_path, self.project_path)
+                # Normalize path separator for cross-platform compatibility
+                new_rel_path = normalize_path_separator(
+                    os.path.relpath(new_abs_path, self.project_path)
+                )
                 self._add_to_pending_writes(
                     operation_type="rename",
                     commit_hash=commit_hash,
@@ -709,7 +715,10 @@ class MemovManager:
         """Remove a tracked file from the memov repo, and generate a commit to record the operation."""
         try:
             target_abs_path = os.path.abspath(file_path)
-            target_rel_path = os.path.relpath(target_abs_path, self.project_path)
+            # Normalize path separator for cross-platform compatibility
+            target_rel_path = normalize_path_separator(
+                os.path.relpath(target_abs_path, self.project_path)
+            )
 
             # Check if the file is tracked on the current branch
             head_commit = GitManager.get_commit_id_by_ref(
@@ -1538,7 +1547,10 @@ class MemovManager:
             # If the file is a directory, walk through it
             if os.path.isdir(abs_path):
                 for root, dirs, files in os.walk(abs_path):
-                    rel_root = os.path.relpath(root, self.project_path)
+                    # Normalize path separator for cross-platform compatibility
+                    rel_root = normalize_path_separator(
+                        os.path.relpath(root, self.project_path)
+                    )
 
                     # Don't filter the current directory itself
                     if (
@@ -1554,7 +1566,10 @@ class MemovManager:
                         dirs.remove(".git")
 
                     for file in files:
-                        rel_file = os.path.relpath(os.path.join(root, file), self.project_path)
+                        # Normalize path separator for cross-platform compatibility
+                        rel_file = normalize_path_separator(
+                            os.path.relpath(os.path.join(root, file), self.project_path)
+                        )
                         if filter(rel_file):
                             continue
 
@@ -1562,7 +1577,10 @@ class MemovManager:
 
             # If the file is a regular file, check if it should be tracked
             elif os.path.isfile(abs_path):
-                rel_file = os.path.relpath(abs_path, self.project_path)
+                # Normalize path separator for cross-platform compatibility
+                rel_file = normalize_path_separator(
+                    os.path.relpath(abs_path, self.project_path)
+                )
                 if filter(rel_file):
                     continue
 

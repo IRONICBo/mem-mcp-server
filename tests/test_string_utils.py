@@ -4,6 +4,7 @@ import pytest
 
 from memov.utils.string_utils import (
     clean_windows_git_lstree_output,
+    normalize_path_separator,
     short_msg,
     split_path_parts,
 )
@@ -66,6 +67,44 @@ class TestCleanWindowsGitLstreeOutput:
         """Non-string input should raise TypeError."""
         with pytest.raises(TypeError):
             clean_windows_git_lstree_output(123)
+
+
+class TestNormalizePathSeparator:
+    """Tests for normalize_path_separator function."""
+
+    def test_unix_path_unchanged(self):
+        """Unix-style paths should remain unchanged."""
+        assert normalize_path_separator("src/utils/file.py") == "src/utils/file.py"
+
+    def test_windows_path_converted(self):
+        """Windows-style backslashes should be converted to forward slashes."""
+        assert normalize_path_separator("src\\utils\\file.py") == "src/utils/file.py"
+
+    def test_mixed_separators(self):
+        """Mixed separators should all become forward slashes."""
+        assert normalize_path_separator("src/utils\\file.py") == "src/utils/file.py"
+        assert normalize_path_separator("src\\utils/file.py") == "src/utils/file.py"
+
+    def test_empty_string(self):
+        """Empty string should return empty string."""
+        assert normalize_path_separator("") == ""
+
+    def test_single_file(self):
+        """Single file without path should remain unchanged."""
+        assert normalize_path_separator("file.py") == "file.py"
+
+    def test_deep_windows_path(self):
+        """Deep Windows paths should be fully converted."""
+        assert normalize_path_separator("a\\b\\c\\d\\e\\f.txt") == "a/b/c/d/e/f.txt"
+
+    def test_trailing_separator(self):
+        """Trailing separators should be converted."""
+        assert normalize_path_separator("src\\utils\\") == "src/utils/"
+        assert normalize_path_separator("src/utils/") == "src/utils/"
+
+    def test_path_with_spaces(self):
+        """Paths with spaces should be handled correctly."""
+        assert normalize_path_separator("My Documents\\file.txt") == "My Documents/file.txt"
 
 
 class TestSplitPathParts:

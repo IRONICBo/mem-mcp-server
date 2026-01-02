@@ -24,6 +24,22 @@ def clean_windows_git_lstree_output(output: str) -> str:
     return result
 
 
+def normalize_path_separator(path: str) -> str:
+    """Normalize path separators to forward slashes for git compatibility.
+
+    Git always uses forward slashes ('/') for paths, but on Windows,
+    os.path functions return backslashes ('\\').
+    This function converts all backslashes to forward slashes.
+
+    Args:
+        path: A file path (may use '/' or '\\' as separator)
+
+    Returns:
+        Path with all separators normalized to forward slashes
+    """
+    return path.replace("\\", "/")
+
+
 def split_path_parts(rel_path: str) -> list[str]:
     """Split a relative path into parts, handling both Unix and Windows separators.
 
@@ -38,4 +54,4 @@ def split_path_parts(rel_path: str) -> list[str]:
     """
     # Normalize to forward slashes then split
     # This handles both Git output (/) and Windows os.path output (\\)
-    return rel_path.replace("\\", "/").split("/")
+    return normalize_path_separator(rel_path).split("/")
