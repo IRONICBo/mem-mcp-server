@@ -519,6 +519,11 @@ class MemovManager:
                 for rel_path, abs_path in zip(tracked_file_rel_paths, tracked_file_abs_paths):
                     commit_file_paths[rel_path] = abs_path
 
+                # DEBUG: Print first few commit_file_paths entries
+                print(f"[DEBUG] snapshot: commit_file_paths has {len(commit_file_paths)} entries")
+                for i, (rel, abs_p) in enumerate(list(commit_file_paths.items())[:3]):
+                    print(f"[DEBUG] snapshot: commit_file_paths[{i}]: rel={repr(rel)}, abs={repr(abs_p)}")
+
                 commit_msg = "Create snapshot\n\n"
                 commit_msg += f"Prompt: {prompt}\nResponse: {response}\nAgent Plan: {agent_plan}\nSource: {'User' if by_user else 'AI'}"
 

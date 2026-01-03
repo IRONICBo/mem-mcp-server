@@ -106,8 +106,15 @@ class GitManager:
             file_abs_paths = []
             # repo_path is .mem/memov.git, project root is two levels up
             project_root = Path(repo_path).parent.parent
+
+            # DEBUG: Print raw stdout (first 500 chars)
+            raw_stdout = output.stdout
+            print(f"[DEBUG] get_files_by_commit raw stdout (repr): {repr(raw_stdout[:500])}")
+
             # Clean the entire output first to remove any stray control characters
-            cleaned_stdout = output.stdout.replace('\r', '').strip()
+            cleaned_stdout = raw_stdout.replace('\r', '').strip()
+            print(f"[DEBUG] get_files_by_commit cleaned stdout (repr): {repr(cleaned_stdout[:500])}")
+
             for rel_file in cleaned_stdout.splitlines():
                 rel_file = clean_windows_git_lstree_output(rel_file)
                 # Skip empty lines
@@ -115,6 +122,11 @@ class GitManager:
                     continue
                 # Build absolute path using os.path.join for proper Windows handling
                 abs_file_path = str((project_root / rel_file).resolve())
+
+                # DEBUG: Print first few paths
+                if len(file_rel_paths) < 3:
+                    print(f"[DEBUG] rel_file={repr(rel_file)}, abs_file_path={repr(abs_file_path)}")
+
                 file_rel_paths.append(rel_file)
                 file_abs_paths.append(abs_file_path)
 
@@ -203,9 +215,18 @@ class GitManager:
         if not file_paths:
             return {}
 
+        # DEBUG: Print first few file paths
+        print(f"[DEBUG] write_blobs called with {len(file_paths)} paths")
+        for i, fp in enumerate(file_paths[:3]):
+            print(f"[DEBUG] write_blobs file_paths[{i}] = {repr(fp)}")
+
         # Use --stdin-paths to batch process all files in one git call
         command = ["git", f"--git-dir={repo_path}", "hash-object", "-w", "--stdin-paths"]
         input_paths = "\n".join(file_paths)
+
+        # DEBUG: Print input_paths (first 500 chars)
+        print(f"[DEBUG] write_blobs input_paths (repr, first 500): {repr(input_paths[:500])}")
+
         success, output = subprocess_call(command=command, input=input_paths)
 
         if success and output.stdout:
@@ -271,6 +292,11 @@ class GitManager:
         """
         if len(new_file_paths) == 0:
             return ""
+
+        # DEBUG: Print first few entries from new_file_paths
+        print(f"[DEBUG] write_blob_to_bare_repo called with {len(new_file_paths)} files")
+        for i, (rel, abs_p) in enumerate(list(new_file_paths.items())[:3]):
+            print(f"[DEBUG] new_file_paths[{i}]: rel={repr(rel)}, abs={repr(abs_p)}")
 
         # Batch write all blobs in a single git call for better performance
         abs_paths = list(new_file_paths.values())
