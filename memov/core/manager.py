@@ -139,9 +139,40 @@ class MemovManager:
             # Ensure .memignore exists and is tracked
             if not os.path.exists(self.memignore_path):
                 with open(self.memignore_path, "w") as f:
-                    f.write("# Add files/directories to ignore from memov tracking\n")
-                    f.write("# Ignore all hidden files (starting with .)\n")
-                    f.write(".*\n")
+                    f.write("# Memov ignore file - similar to .gitignore\n")
+                    f.write("# Files/directories matching these patterns will be ignored\n\n")
+                    f.write("# Hidden files and directories\n")
+                    f.write(".*\n\n")
+                    f.write("# Python\n")
+                    f.write("__pycache__/\n")
+                    f.write("*.py[cod]\n")
+                    f.write("*.egg-info/\n")
+                    f.write("*.egg\n")
+                    f.write(".venv/\n")
+                    f.write("venv/\n")
+                    f.write("env/\n\n")
+                    f.write("# Node.js\n")
+                    f.write("node_modules/\n")
+                    f.write("package-lock.json\n")
+                    f.write("yarn.lock\n")
+                    f.write("pnpm-lock.yaml\n\n")
+                    f.write("# Build outputs\n")
+                    f.write("dist/\n")
+                    f.write("build/\n")
+                    f.write("out/\n")
+                    f.write("target/\n\n")
+                    f.write("# IDE and editors\n")
+                    f.write(".idea/\n")
+                    f.write(".vscode/\n")
+                    f.write("*.swp\n")
+                    f.write("*.swo\n\n")
+                    f.write("# OS files\n")
+                    f.write(".DS_Store\n")
+                    f.write("Thumbs.db\n\n")
+                    f.write("# Logs and temp files\n")
+                    f.write("*.log\n")
+                    f.write("*.tmp\n")
+                    f.write("*.temp\n")
                 self.track(
                     [self.memignore_path],
                     prompt="Initialize .memignore",
@@ -220,8 +251,12 @@ class MemovManager:
                         current[parts[-1]] = blob_hash
 
                 # Add new files with their current content (new blobs)
+                # Batch write all blobs in a single git call for better performance
+                abs_paths = [abs_path for _, abs_path in new_files]
+                path_to_blob = GitManager.write_blobs(self.bare_repo_path, abs_paths)
+
                 for rel_path, abs_path in new_files:
-                    blob_hash = GitManager.write_blob(self.bare_repo_path, abs_path)
+                    blob_hash = path_to_blob.get(abs_path)
                     if not blob_hash:
                         LOGGER.error(f"Failed to create blob for {rel_path}")
                         return MemStatus.UNKNOWN_ERROR
@@ -381,25 +416,34 @@ class MemovManager:
                 )
 
                 # Build tree with: specified files from workspace (new blobs), others from HEAD (old blobs)
-                # We need to create blobs and build the tree structure manually
-                tree_structure = {}
-
-                for rel_path in tracked_file_rel_paths:
-                    if rel_path in tracked_specified:
-                        # Create new blob from current workspace content
-                        current_abs_path = Path(self.project_path) / rel_path
-                        if current_abs_path.exists():
-                            blob_hash = GitManager.write_blob(
-                                self.bare_repo_path, str(current_abs_path)
-                            )
-                        else:
-                            LOGGER.warning(
-                                f"Specified file {rel_path} does not exist, using HEAD version"
-                            )
-                            abs_resolved = (Path(self.project_path) / rel_path).resolve()
-                            blob_hash = head_file_blobs.get(abs_resolved)
+                # Batch write all specified files in a single git call for better performance
+                files_to_hash = []
+                rel_to_abs = {}
+                missing_files = set()
+                for rel_path in tracked_specified:
+                    current_abs_path = Path(self.project_path) / rel_path
+                    if current_abs_path.exists():
+                        abs_str = str(current_abs_path)
+                        files_to_hash.append(abs_str)
+                        rel_to_abs[rel_path] = abs_str
                     else:
-                        # Use blob from HEAD for non-specified files
+                        LOGGER.warning(
+                            f"Specified file {rel_path} does not exist, using HEAD version"
+                        )
+                        missing_files.add(rel_path)
+
+                # Batch write blobs for existing specified files
+                path_to_blob = GitManager.write_blobs(self.bare_repo_path, files_to_hash)
+
+                # Build tree structure
+                tree_structure = {}
+                for rel_path in tracked_file_rel_paths:
+                    if rel_path in tracked_specified and rel_path not in missing_files:
+                        # Use batch-computed blob hash
+                        abs_path = rel_to_abs.get(rel_path)
+                        blob_hash = path_to_blob.get(abs_path) if abs_path else None
+                    else:
+                        # Use blob from HEAD for non-specified files or missing files
                         abs_resolved = (Path(self.project_path) / rel_path).resolve()
                         blob_hash = head_file_blobs.get(abs_resolved)
 
@@ -1337,10 +1381,13 @@ class MemovManager:
             workspace_files = self._filter_new_files(
                 [self.project_path], tracked_file_rel_paths=None, exclude_memignore=True
             )
-            worktree_files_and_blobs = {}
-            for rel_path, abs_path in workspace_files:
-                blob_hash = GitManager.write_blob(self.bare_repo_path, abs_path)
-                worktree_files_and_blobs[Path(abs_path).resolve()] = blob_hash
+            # Batch write all blobs in a single git call for better performance
+            abs_paths = [abs_path for _, abs_path in workspace_files]
+            path_to_blob = GitManager.write_blobs(self.bare_repo_path, abs_paths)
+            worktree_files_and_blobs = {
+                Path(abs_path).resolve(): path_to_blob.get(abs_path, "")
+                for _, abs_path in workspace_files
+            }
 
             # Compare tracked files with workspace files
             all_files: set[Path] = set(
@@ -1446,12 +1493,14 @@ class MemovManager:
             exclude_memignore (bool): Whether to exclude files that match .memignore rules.
         """
         memignore_pspec = self._load_memignore()
+        # Convert to set for O(1) lookup instead of O(n) list lookup
+        tracked_set = set(tracked_file_rel_paths) if tracked_file_rel_paths else None
 
         def filter(file_rel_path: str) -> bool:
             """Check if the file should be ignored"""
 
             # Filter out files that are already tracked if tracked_file_rel_paths is provided
-            if tracked_file_rel_paths is not None and file_rel_path in tracked_file_rel_paths:
+            if tracked_set is not None and file_rel_path in tracked_set:
                 return True
 
             # Never filter out .memignore itself based on .memignore rules

@@ -167,6 +167,54 @@ class GitManager:
             return ""
 
     @staticmethod
+    def write_blobs(repo_path: str, file_paths: list[str]) -> dict[str, str]:
+        """Write multiple files as blobs in the Git repository in a single batch operation.
+
+        This is much more efficient than calling write_blob() for each file individually,
+        as it uses a single git process with --stdin-paths.
+
+        Args:
+            repo_path: Path to the Git repository.
+            file_paths: List of absolute file paths to write as blobs.
+
+        Returns:
+            Dictionary mapping file paths to their blob hashes.
+            Files that failed to hash will not be included in the result.
+        """
+        if not file_paths:
+            return {}
+
+        # Use --stdin-paths to batch process all files in one git call
+        command = ["git", f"--git-dir={repo_path}", "hash-object", "-w", "--stdin-paths"]
+        input_paths = "\n".join(file_paths)
+        success, output = subprocess_call(command=command, input=input_paths)
+
+        if success and output.stdout:
+            hashes = output.stdout.strip().splitlines()
+            if len(hashes) == len(file_paths):
+                return dict(zip(file_paths, hashes))
+            else:
+                LOGGER.warning(
+                    f"Hash count mismatch: expected {len(file_paths)}, got {len(hashes)}"
+                )
+                # Fall back to individual processing
+                result = {}
+                for file_path in file_paths:
+                    blob_hash = GitManager.write_blob(repo_path, file_path)
+                    if blob_hash:
+                        result[file_path] = blob_hash
+                return result
+        else:
+            LOGGER.error(f"Failed to batch write blobs in repository at {repo_path}")
+            # Fall back to individual processing
+            result = {}
+            for file_path in file_paths:
+                blob_hash = GitManager.write_blob(repo_path, file_path)
+                if blob_hash:
+                    result[file_path] = blob_hash
+            return result
+
+    @staticmethod
     def create_tree(repo_path: str, entries: list[str]) -> str:
         """Create a tree object in the Git repository."""
         command = ["git", f"--git-dir={repo_path}", "mktree"]
@@ -205,12 +253,16 @@ class GitManager:
         if len(new_file_paths) == 0:
             return ""
 
+        # Batch write all blobs in a single git call for better performance
+        abs_paths = list(new_file_paths.values())
+        path_to_blob = GitManager.write_blobs(bare_repo, abs_paths)
+
         # Build a directory tree structure
         # Format: {"dir1": {"dir2": {"file.txt": blob_hash}}}
         tree_structure = {}
 
         for rel_file, abs_path in new_file_paths.items():
-            blob_hash = GitManager.write_blob(bare_repo, abs_path)
+            blob_hash = path_to_blob.get(abs_path)
             if not blob_hash:
                 LOGGER.error(f"Failed to create blob for {rel_file}")
                 return ""
