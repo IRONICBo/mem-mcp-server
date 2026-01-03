@@ -179,6 +179,18 @@ class MemovManager:
                     response="Created default .memignore file",
                 )
 
+            # Auto-track all project files (excluding .memignore patterns)
+            # This ensures the initial project state is recorded before AI starts working
+            track_result = self.track(
+                [self.project_path],
+                prompt="Initial project state",
+                response="Auto-tracked all project files on init",
+            )
+            if track_result == MemStatus.SUCCESS:
+                LOGGER.info("Auto-tracked all project files on init")
+            else:
+                LOGGER.warning(f"Failed to auto-track project files: {track_result}")
+
             return MemStatus.SUCCESS
         except Exception as e:
             LOGGER.error(f"Error initializing memov project: {e}")
