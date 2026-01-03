@@ -106,8 +106,14 @@ class GitManager:
             file_abs_paths = []
             # repo_path is .mem/memov.git, project root is two levels up
             project_root = Path(repo_path).parent.parent
-            for rel_file in output.stdout.strip().splitlines():
+            # Clean the entire output first to remove any stray control characters
+            cleaned_stdout = output.stdout.replace('\r', '').strip()
+            for rel_file in cleaned_stdout.splitlines():
                 rel_file = clean_windows_git_lstree_output(rel_file)
+                # Skip empty lines
+                if not rel_file:
+                    continue
+                # Build absolute path using os.path.join for proper Windows handling
                 abs_file_path = str((project_root / rel_file).resolve())
                 file_rel_paths.append(rel_file)
                 file_abs_paths.append(abs_file_path)
@@ -135,7 +141,9 @@ class GitManager:
 
         if success and output.stdout:
             file_blobs = {}
-            for line in output.stdout.strip().splitlines():
+            # Clean the entire output first to remove any stray control characters
+            cleaned_stdout = output.stdout.replace('\r', '').strip()
+            for line in cleaned_stdout.splitlines():
                 # git ls-tree format: "<mode> <type> <hash>\t<filename>"
                 # Split by tab first to handle filenames with spaces
                 if "\t" in line:
@@ -144,6 +152,9 @@ class GitManager:
                     if len(meta_parts) == 3:
                         blob_hash = meta_parts[2]
                         rel_file = clean_windows_git_lstree_output(rel_file)
+                        # Skip empty lines
+                        if not rel_file:
+                            continue
                         # If project_path is provided, resolve relative to it; otherwise use cwd
                         if project_path:
                             abs_path = (Path(project_path) / rel_file).resolve()
