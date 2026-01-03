@@ -63,6 +63,17 @@ class TestCleanWindowsGitLstreeOutput:
         """Should handle paths with spaces (often quoted by git)."""
         assert clean_windows_git_lstree_output('"path with spaces/file.py"') == "path with spaces/file.py"
 
+    def test_multiple_carriage_returns(self):
+        """Should remove all carriage returns, not just at the end."""
+        assert clean_windows_git_lstree_output("file.py\r\r\r") == "file.py"
+        assert clean_windows_git_lstree_output("\r\rfile.py\r\r") == "file.py"
+
+    def test_embedded_control_chars(self):
+        """Should remove embedded carriage returns and newlines."""
+        # This should never happen in practice, but handle gracefully
+        assert clean_windows_git_lstree_output("docs\r\nimages") == "docsimages"
+        assert clean_windows_git_lstree_output("docs\rimages") == "docsimages"
+
     def test_invalid_type(self):
         """Non-string input should raise TypeError."""
         with pytest.raises(TypeError):

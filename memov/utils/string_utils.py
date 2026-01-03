@@ -15,12 +15,16 @@ def clean_windows_git_lstree_output(output: str) -> str:
     - Windows CRLF line endings (\\r\\n)
     - Quoted paths (git quotes paths with special characters)
     - Trailing/leading whitespace
+    - Any stray carriage return or newline characters
     """
     if not isinstance(output, str):
         raise TypeError(f"Expected str, got {type(output)}")
 
-    # First remove line endings, then strip whitespace, then remove quotes
-    result = output.split('\r')[0].split('\n')[0].strip().strip('"')
+    # Remove ALL carriage return and newline characters (not just at the end)
+    # This handles cases where git output may have embedded control characters
+    result = output.replace('\r', '').replace('\n', '')
+    # Strip whitespace and remove quotes
+    result = result.strip().strip('"')
     return result
 
 

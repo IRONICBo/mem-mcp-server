@@ -40,7 +40,8 @@ def subprocess_call(
         return True, output
     except subprocess.CalledProcessError as e:
         LOGGER.debug(f"Command failed: {' '.join(command)}\nStdout: {e.stdout}\nStderr: {e.stderr}")
-        return False, None
+        # Return the exception object so callers can access stderr for better error messages
+        return False, e
 
 
 class GitManager:
@@ -432,8 +433,18 @@ class GitManager:
         if success:
             return output.stdout
         else:
+            # Get detailed error message from git
+            stderr_msg = ""
+            if output is not None and hasattr(output, 'stderr'):
+                stderr = output.stderr
+                # Handle both bytes and string stderr
+                if isinstance(stderr, bytes):
+                    stderr_msg = stderr.decode('utf-8', errors='replace')
+                else:
+                    stderr_msg = str(stderr)
             LOGGER.error(
-                f"Failed to export commit {commit_id} to tar archive in repository at {bare_repo}"
+                f"Failed to export commit {commit_id} to tar archive in repository at {bare_repo}. "
+                f"Git error: {stderr_msg}"
             )
             return None
 
