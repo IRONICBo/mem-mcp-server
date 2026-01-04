@@ -227,10 +227,12 @@ class GitManager:
         # DEBUG: Print input_paths (first 500 chars)
         print(f"[DEBUG] write_blobs input_paths (repr, first 500): {repr(input_paths[:500])}")
 
-        success, output = subprocess_call(command=command, input=input_paths)
+        # Use binary mode to prevent Windows from converting \n to \r\n
+        input_data = input_paths.encode('utf-8')
+        success, output = subprocess_call(command=command, input=input_data, text=False)
 
         if success and output.stdout:
-            hashes = output.stdout.strip().splitlines()
+            hashes = output.stdout.decode('utf-8').strip().splitlines()
             if len(hashes) == len(file_paths):
                 return dict(zip(file_paths, hashes))
             else:
@@ -258,10 +260,12 @@ class GitManager:
     def create_tree(repo_path: str, entries: list[str]) -> str:
         """Create a tree object in the Git repository."""
         command = ["git", f"--git-dir={repo_path}", "mktree"]
-        success, output = subprocess_call(command=command, input="".join(entries))
+        # Use binary mode to prevent Windows from converting \n to \r\n
+        input_data = "".join(entries).encode('utf-8')
+        success, output = subprocess_call(command=command, input=input_data, text=False)
 
         if success and output.stdout:
-            return output.stdout.strip()
+            return output.stdout.decode('utf-8').strip()
         else:
             LOGGER.error(f"Failed to create tree in repository at {repo_path}")
             return ""
@@ -274,10 +278,12 @@ class GitManager:
         if parent_hash:
             command.extend(["-p", parent_hash])
 
-        success, output = subprocess_call(command=command, input=commit_msg)
+        # Use binary mode to prevent Windows from converting \n to \r\n
+        input_data = commit_msg.encode('utf-8')
+        success, output = subprocess_call(command=command, input=input_data, text=False)
 
         if success and output.stdout:
-            return output.stdout.strip()
+            return output.stdout.decode('utf-8').strip()
         else:
             LOGGER.error(f"Failed to commit tree in repository at {repo_path}")
             return ""
@@ -506,9 +512,17 @@ class GitManager:
         """
         # Use git notes with -F - to read message from stdin (supports multiline)
         command = ["git", f"--git-dir={repo_path}", "notes", "add", "-f", "-F", "-", commit_hash]
-        success, output = subprocess_call(command=command, input=new_message)
+        # Use binary mode to prevent Windows from converting \n to \r\n
+        input_data = new_message.encode('utf-8')
+        success, output = subprocess_call(command=command, input=input_data, text=False)
         if not success:
-            error_msg = output.stderr if output else "Unknown error"
+            error_msg = ""
+            if output is not None and hasattr(output, 'stderr'):
+                stderr = output.stderr
+                if isinstance(stderr, bytes):
+                    error_msg = stderr.decode('utf-8', errors='replace')
+                else:
+                    error_msg = str(stderr) if stderr else "Unknown error"
             LOGGER.error(f"Failed to add git note for {commit_hash}: {error_msg}")
             return False, error_msg
         return True, ""
