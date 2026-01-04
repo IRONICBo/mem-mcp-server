@@ -1138,16 +1138,27 @@ Files: ${(node.files || []).join(', ') || 'None'}
 
             if (files.length === 0) return '';
 
-            const shown = files.slice(0, maxShow);
-            const remaining = files.length - maxShow;
+            // Categorize files by status
+            const changedFiles = [];
+            const unchangedFiles = [];
 
-            let html = shown.map(f => {
+            files.forEach(f => {
                 const fileDiff = diff[f];
-                let status = 'unchanged';
-                if (fileDiff) {
-                    status = fileDiff.status || 'modified';
+                const status = fileDiff ? (fileDiff.status || 'modified') : 'unchanged';
+                if (status === 'unchanged') {
+                    unchangedFiles.push({ file: f, status });
+                } else {
+                    changedFiles.push({ file: f, status });
                 }
-                const fileName = f.split('/').pop();
+            });
+
+            // Show changed files first, then unchanged
+            const sortedFiles = [...changedFiles, ...unchangedFiles];
+            const shown = sortedFiles.slice(0, maxShow);
+            const remaining = sortedFiles.length - maxShow;
+
+            let html = shown.map(({ file, status }) => {
+                const fileName = file.split('/').pop();
                 return `<span class="node-file ${status}">${fileName}</span>`;
             }).join('');
 
@@ -1166,7 +1177,11 @@ Files: ${(node.files || []).join(', ') || 'None'}
                 return '<span style="color: #999; font-size: 12px;">No files</span>';
             }
 
-            return files.map(f => {
+            // Categorize files
+            const changedFiles = [];
+            const unchangedFiles = [];
+
+            files.forEach(f => {
                 const fileDiff = diff[f];
                 let status = 'unchanged';
                 let icon = '·';
@@ -1178,17 +1193,61 @@ Files: ${(node.files || []).join(', ') || 'None'}
                     else if (status === 'modified') icon = '~';
                 }
 
-                // Get just the filename for display
                 const fileName = f.split('/').pop();
                 const hasPath = f.includes('/');
                 const title = hasPath ? f : '';
 
-                return `<span class="detail-file ${status}"
+                const fileHtml = `<span class="detail-file ${status}"
                              onclick="event.stopPropagation(); showFileDiff('${node.id}', '${f}')"
                              title="${title}">
                     <span class="status-icon">${icon}</span>${fileName}
                 </span>`;
-            }).join('');
+
+                if (status === 'unchanged') {
+                    unchangedFiles.push(fileHtml);
+                } else {
+                    changedFiles.push(fileHtml);
+                }
+            });
+
+            let html = '';
+
+            // Show changed files first
+            if (changedFiles.length > 0) {
+                html += changedFiles.join('');
+            }
+
+            // Show collapsed unchanged files section if any
+            if (unchangedFiles.length > 0) {
+                const toggleId = `unchanged-${node.id}`;
+                html += `<div style="width: 100%; margin-top: 8px;">
+                    <span class="detail-file unchanged" style="cursor: pointer;" onclick="event.stopPropagation(); toggleUnchanged('${toggleId}')">
+                        <span class="status-icon" id="${toggleId}-icon">+</span>${unchangedFiles.length} unchanged files
+                    </span>
+                    <div id="${toggleId}" style="display: none; margin-top: 6px;">
+                        ${unchangedFiles.join('')}
+                    </div>
+                </div>`;
+            }
+
+            // If no changed files, show a message
+            if (changedFiles.length === 0 && unchangedFiles.length > 0) {
+                html = `<span style="color: #999; font-size: 12px; margin-right: 8px;">No changes</span>` + html;
+            }
+
+            return html;
+        }
+
+        function toggleUnchanged(toggleId) {
+            const container = document.getElementById(toggleId);
+            const icon = document.getElementById(toggleId + '-icon');
+            if (container.style.display === 'none') {
+                container.style.display = 'block';
+                icon.textContent = '−';
+            } else {
+                container.style.display = 'none';
+                icon.textContent = '+';
+            }
         }
 
         function showFileDiff(commitHash, fileName) {

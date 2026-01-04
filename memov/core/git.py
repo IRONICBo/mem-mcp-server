@@ -133,19 +133,24 @@ class GitManager:
         if success and output.stdout:
             file_blobs = {}
             for line in output.stdout.strip().splitlines():
-                parts = line.split()
-                if len(parts) == 4:
-                    blob_hash = parts[2]
-                    rel_file = parts[3]
-                    rel_file = clean_windows_git_lstree_output(rel_file)
-                    # If project_path is provided, resolve relative to it; otherwise use cwd
-                    if project_path:
-                        abs_path = (Path(project_path) / rel_file).resolve()
+                # git ls-tree format: "<mode> <type> <hash>\t<filename>"
+                # Split by tab first to handle filenames with spaces
+                if "\t" in line:
+                    meta, rel_file = line.split("\t", 1)
+                    meta_parts = meta.split()
+                    if len(meta_parts) == 3:
+                        blob_hash = meta_parts[2]
+                        rel_file = clean_windows_git_lstree_output(rel_file)
+                        # If project_path is provided, resolve relative to it; otherwise use cwd
+                        if project_path:
+                            abs_path = (Path(project_path) / rel_file).resolve()
+                        else:
+                            abs_path = Path(rel_file).resolve()
+                        file_blobs[abs_path] = blob_hash
                     else:
-                        abs_path = Path(rel_file).resolve()
-                    file_blobs[abs_path] = blob_hash
+                        LOGGER.warning(f"Unexpected output format: {line}")
                 else:
-                    LOGGER.warning(f"Unexpected output format: {line}")
+                    LOGGER.warning(f"Unexpected output format (no tab): {line}")
 
             return file_blobs
         else:
