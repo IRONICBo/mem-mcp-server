@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 from typing import Optional
 
-from memov.utils.string_utils import clean_windows_git_lstree_output
+from memov.utils.string_utils import clean_windows_git_lstree_output, split_path_parts
 
 LOGGER = logging.getLogger(__name__)
 
@@ -40,7 +40,8 @@ def subprocess_call(
         return True, output
     except subprocess.CalledProcessError as e:
         LOGGER.debug(f"Command failed: {' '.join(command)}\nStdout: {e.stdout}\nStderr: {e.stderr}")
-        return False, None
+        # Return the exception object so callers can access stderr for better error messages
+        return False, e
 
 
 class GitManager:
@@ -103,9 +104,27 @@ class GitManager:
         if success and output.stdout:
             file_rel_paths = []
             file_abs_paths = []
-            for rel_file in output.stdout.strip().splitlines():
+            # repo_path is .mem/memov.git, project root is two levels up
+            project_root = Path(repo_path).parent.parent
+
+            raw_stdout = output.stdout
+            LOGGER.debug(f"get_files_by_commit raw stdout (repr): {repr(raw_stdout[:500])}")
+
+            # Clean the entire output first to remove any stray control characters
+            cleaned_stdout = raw_stdout.replace('\r', '').strip()
+            LOGGER.debug(f"get_files_by_commit cleaned stdout (repr): {repr(cleaned_stdout[:500])}")
+
+            for rel_file in cleaned_stdout.splitlines():
                 rel_file = clean_windows_git_lstree_output(rel_file)
-                abs_file_path = os.path.join(repo_path, "..", "..", rel_file)
+                # Skip empty lines
+                if not rel_file:
+                    continue
+                # Build absolute path using os.path.join for proper Windows handling
+                abs_file_path = str((project_root / rel_file).resolve())
+
+                if len(file_rel_paths) < 3:
+                    LOGGER.debug(f"get_files_by_commit: rel_file={repr(rel_file)}, abs_file_path={repr(abs_file_path)}")
+
                 file_rel_paths.append(rel_file)
                 file_abs_paths.append(abs_file_path)
 
@@ -132,7 +151,9 @@ class GitManager:
 
         if success and output.stdout:
             file_blobs = {}
-            for line in output.stdout.strip().splitlines():
+            # Clean the entire output first to remove any stray control characters
+            cleaned_stdout = output.stdout.replace('\r', '').strip()
+            for line in cleaned_stdout.splitlines():
                 # git ls-tree format: "<mode> <type> <hash>\t<filename>"
                 # Split by tab first to handle filenames with spaces
                 if "\t" in line:
@@ -141,6 +162,9 @@ class GitManager:
                     if len(meta_parts) == 3:
                         blob_hash = meta_parts[2]
                         rel_file = clean_windows_git_lstree_output(rel_file)
+                        # Skip empty lines
+                        if not rel_file:
+                            continue
                         # If project_path is provided, resolve relative to it; otherwise use cwd
                         if project_path:
                             abs_path = (Path(project_path) / rel_file).resolve()
@@ -189,13 +213,22 @@ class GitManager:
         if not file_paths:
             return {}
 
+        LOGGER.debug(f"write_blobs called with {len(file_paths)} paths")
+        for i, fp in enumerate(file_paths[:3]):
+            LOGGER.debug(f"write_blobs file_paths[{i}] = {repr(fp)}")
+
         # Use --stdin-paths to batch process all files in one git call
         command = ["git", f"--git-dir={repo_path}", "hash-object", "-w", "--stdin-paths"]
         input_paths = "\n".join(file_paths)
-        success, output = subprocess_call(command=command, input=input_paths)
+
+        LOGGER.debug(f"write_blobs input_paths (repr, first 500): {repr(input_paths[:500])}")
+
+        # Use binary mode to prevent Windows from converting \n to \r\n
+        input_data = input_paths.encode('utf-8')
+        success, output = subprocess_call(command=command, input=input_data, text=False)
 
         if success and output.stdout:
-            hashes = output.stdout.strip().splitlines()
+            hashes = output.stdout.decode('utf-8').strip().splitlines()
             if len(hashes) == len(file_paths):
                 return dict(zip(file_paths, hashes))
             else:
@@ -223,10 +256,12 @@ class GitManager:
     def create_tree(repo_path: str, entries: list[str]) -> str:
         """Create a tree object in the Git repository."""
         command = ["git", f"--git-dir={repo_path}", "mktree"]
-        success, output = subprocess_call(command=command, input="".join(entries))
+        # Use binary mode to prevent Windows from converting \n to \r\n
+        input_data = "".join(entries).encode('utf-8')
+        success, output = subprocess_call(command=command, input=input_data, text=False)
 
         if success and output.stdout:
-            return output.stdout.strip()
+            return output.stdout.decode('utf-8').strip()
         else:
             LOGGER.error(f"Failed to create tree in repository at {repo_path}")
             return ""
@@ -239,10 +274,12 @@ class GitManager:
         if parent_hash:
             command.extend(["-p", parent_hash])
 
-        success, output = subprocess_call(command=command, input=commit_msg)
+        # Use binary mode to prevent Windows from converting \n to \r\n
+        input_data = commit_msg.encode('utf-8')
+        success, output = subprocess_call(command=command, input=input_data, text=False)
 
         if success and output.stdout:
-            return output.stdout.strip()
+            return output.stdout.decode('utf-8').strip()
         else:
             LOGGER.error(f"Failed to commit tree in repository at {repo_path}")
             return ""
@@ -258,6 +295,10 @@ class GitManager:
         if len(new_file_paths) == 0:
             return ""
 
+        LOGGER.debug(f"write_blob_to_bare_repo called with {len(new_file_paths)} files")
+        for i, (rel, abs_p) in enumerate(list(new_file_paths.items())[:3]):
+            LOGGER.debug(f"write_blob_to_bare_repo new_file_paths[{i}]: rel={repr(rel)}, abs={repr(abs_p)}")
+
         # Batch write all blobs in a single git call for better performance
         abs_paths = list(new_file_paths.values())
         path_to_blob = GitManager.write_blobs(bare_repo, abs_paths)
@@ -272,8 +313,8 @@ class GitManager:
                 LOGGER.error(f"Failed to create blob for {rel_file}")
                 return ""
 
-            # Split path into parts
-            parts = rel_file.split("/")
+            # Split path into parts (cross-platform compatible)
+            parts = split_path_parts(rel_file)
             current = tree_structure
 
             # Navigate/create nested structure
@@ -430,8 +471,18 @@ class GitManager:
         if success:
             return output.stdout
         else:
+            # Get detailed error message from git
+            stderr_msg = ""
+            if output is not None and hasattr(output, 'stderr'):
+                stderr = output.stderr
+                # Handle both bytes and string stderr
+                if isinstance(stderr, bytes):
+                    stderr_msg = stderr.decode('utf-8', errors='replace')
+                else:
+                    stderr_msg = str(stderr)
             LOGGER.error(
-                f"Failed to export commit {commit_id} to tar archive in repository at {bare_repo}"
+                f"Failed to export commit {commit_id} to tar archive in repository at {bare_repo}. "
+                f"Git error: {stderr_msg}"
             )
             return None
 
@@ -456,9 +507,17 @@ class GitManager:
         """
         # Use git notes with -F - to read message from stdin (supports multiline)
         command = ["git", f"--git-dir={repo_path}", "notes", "add", "-f", "-F", "-", commit_hash]
-        success, output = subprocess_call(command=command, input=new_message)
+        # Use binary mode to prevent Windows from converting \n to \r\n
+        input_data = new_message.encode('utf-8')
+        success, output = subprocess_call(command=command, input=input_data, text=False)
         if not success:
-            error_msg = output.stderr if output else "Unknown error"
+            error_msg = ""
+            if output is not None and hasattr(output, 'stderr'):
+                stderr = output.stderr
+                if isinstance(stderr, bytes):
+                    error_msg = stderr.decode('utf-8', errors='replace')
+                else:
+                    error_msg = str(stderr) if stderr else "Unknown error"
             LOGGER.error(f"Failed to add git note for {commit_hash}: {error_msg}")
             return False, error_msg
         return True, ""
