@@ -1,26 +1,25 @@
 <p align="center">
   <a href="https://github.com/memovai/memov">
-    <img src="docs/images/memov-banner.png" width="800px" alt="MemoV - AIコーディングのメモリレイヤー">
+    <img src="../images/memov-banner.png" width="800px" alt="MemoV - AIコーディングのメモリレイヤー">
   </a>
 </p>
 
 <p align="center">
-  <a href="README.md">English</a> | <a href="README_CN.md">简体中文</a> | <b>日本語</b>
+  <a href="../../README.md">English</a> | <a href="README_DE.md">Deutsch</a> | <a href="README_ES.md">Español</a> | <a href="README_FR.md">Français</a> | <b>日本語</b> | <a href="README_KO.md">한국어</a> | <a href="README_PT.md">Português</a> | <a href="README_RU.md">Русский</a> | <a href="README_CN.md">中文</a>
 </p>
 
-# VibeGit🤌：プロンプト、コンテキスト、差分を自動管理
+<h4 align="center">VibeGit🤌：プロンプト、コンテキスト、差分を自動管理</h4>
 
 <div align="center">
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Discord](https://img.shields.io/badge/Discord-Join%20Server-7289da?logo=discord&logoColor=white)](https://discord.gg/un54aD7Hug)
+[![DeepWiki](https://img.shields.io/badge/DeepWiki-memovai%2Fmemov-blue.svg?logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cGF0aCBkPSJNNCAxOWguNmMuNC0uMi44LS41IDEuMi0uOCAyLjItMS42IDMuNy0zLjggNC4yLTYuMyIvPjxwYXRoIGQ9Ik0xNC42IDEyLjFjLjYtLjkgMS4zLTEuOCAyLjEtMi42IDEuMS0xLjEgMi40LTEuOCAzLjgtMi4yIDEuMS0uMyAyLjItLjQgMy4zLS4zIi8+PHBhdGggZD0iTTE5LjQgNS4yYy0uOC4xLTEuNi4zLTIuMy41LS41LjItLjkuNC0xLjQuNy0uNC4zLS44LjYtMS4xIDEiLz48cGF0aCBkPSJNNiAxOGMtMS44IDAtMy0xLjUtMy0zIDAtMi4yIDEuOS0zLjUgMi44LTUgLjUtLjggMS45LTIuNyAyLjMtMy43LjYtMS4yIDEuMi0yLjQgMS42LTMuNi4xLS40LjUtLjkuOS0uOS43IDAgLjggMS4yLjggMS4zIDAgMS40LS4zIDIuOC0uNyA0LjEtLjQgMS41LTEuMSAyLjktMS44IDQuMyIvPjwvc3ZnPg==)](https://deepwiki.com/memovai/memov)
 [![Twitter Follow](https://img.shields.io/twitter/follow/ssslvky?style=social)](https://x.com/ssslvky)
 
 </div>
 
-トレーサブルでGit駆動のAIコーディングメモリ。プロンプト、コンテキスト、コード差分を**自動バージョン管理** - これがVibeGit!🤌
-
-1000回以上の**手動**コミットを省略、.gitは**クリーン**なまま。
+MemoVは、AIコーディングエージェントのためのメモリレイヤーです。プロンプト、コンテキスト、コード差分の**トレーサブル**で**Git駆動**のバージョン管理を提供します。**VibeGit**を実現 - AIコーディングセッションの自動バージョン管理、ブランチ探索、ロールバック機能を備え、標準の.gitリポジトリを**汚染しません**。
 
 <div align="center">
 
@@ -37,12 +36,12 @@
 
 ## 機能
 
-- ⚡ **ワンクリックMCP** — あらゆるAIコーディングエージェントに対応
-- 🧠 **フルコンテキスト** — プロンプト → エージェントプラン → コード差分をリアルタイムでキャプチャ
-- ⏪ **バージョン管理** — ブランチ、ロールバック、任意のインタラクションをリプレイ
-- 🧼 **Gitをクリーンに保つ** — シャドウ `.mem` タイムライン、`.git` を汚染しない
-- 🔍 **ビジュアルUI** — AIコーディング履歴をブラウズ
-- 🔒 **プライバシーファースト** — ローカル、データベース不要、オーバーヘッドなし
+- **ワンクリックMCP** — あらゆるAIコーディングエージェントに対応
+- **VibeGit for Agents** — プロンプト、コンテキスト、コード差分を手動コミットなしで自動追跡
+- **バージョン管理** — ブランチ、ロールバック、任意のインタラクションをリプレイ
+- **Gitをクリーンに保つ** — シャドウ `.mem` タイムライン、`.git` を汚染しない
+- **ビジュアルUI** — チャットで「mem ui」と言うだけ、http://localhost:38888 で表示
+- **プライバシーファースト** — ローカル、データベース不要、オーバーヘッドなし。.memignoreで除外
 
 ## クイックスタート（MCPインストール）
 
@@ -74,7 +73,8 @@ claude mcp add mem-mcp --scope project -- uvx --from git+https://github.com/memo
 codex mcp add mem-mcp -- uvx --from git+https://github.com/memovai/memov.git mem-mcp-launcher stdio $(pwd)
 ```
 
-### VS Code
+<details>
+<summary><b>VS Code</b></summary>
 
 プロジェクトルートに `.vscode/mcp.json` を作成：
 
@@ -96,7 +96,10 @@ codex mcp add mem-mcp -- uvx --from git+https://github.com/memovai/memov.git mem
 }
 ```
 
-### Cursor
+</details>
+
+<details>
+<summary><b>Cursor</b></summary>
 
 **Files > Preferences > Cursor Settings > MCP** に移動し、以下を追加：
 
@@ -117,11 +120,10 @@ codex mcp add mem-mcp -- uvx --from git+https://github.com/memovai/memov.git mem
 }
 ```
 
-### Web UI
+</details>
 
-チャットで **「use mem ui」** と言うだけ — `http://localhost:38888` でタイムラインビュー、ブランチフィルタリング、差分ビューア、任意のスナップショットへのジャンプが開きます。
-
-### VectorDB対応（RAGモード）
+<details>
+<summary><b>VectorDB対応（RAGモード）</b> 🚧 WIP</summary>
 
 セマンティック検索、検証、デバッグツールを有効にするには、`[rag]` エクストラでインストール：
 
@@ -134,6 +136,26 @@ claude mcp add mem-mcp --scope project -- uvx --from "git+https://github.com/mem
 ```
 "git+https://github.com/memovai/memov.git[rag]"
 ```
+
+</details>
+
+### 重要なヒント
+
+**ルールを追加** — 各インタラクション後に自動的にスナップショットを保存するには、コーディングエージェントにルールを追加：
+
+- **Cursor**: Cursor Settings > Rules
+- **Claude Code**: `CLAUDE.md`
+- またはMCPクライアントの同等の設定
+
+ルールの例：
+
+```
+After completing any interaction, always call `use mem snap` to save the snapshot.
+```
+
+## Web UI、Use mem uiと言うだけ🤌
+
+チャットで **「use mem ui」** と言うだけ — `http://localhost:38888` でタイムラインビュー、ブランチフィルタリング、差分ビューア、任意のスナップショットへのジャンプが開きます。
 
 ## CLIインストール（オプション）
 
@@ -185,6 +207,20 @@ sudo dnf install mem
 </details>
 
 <details>
+<summary><b>直接ダウンロード</b></summary>
+
+お使いのプラットフォーム用の最新リリースをダウンロード：
+
+| プラットフォーム | ダウンロード |
+|------------------|--------------|
+| Linux x86_64 | [mem-linux-x86_64.tar.gz](https://github.com/memovai/memov/releases/latest/download/mem-linux-x86_64.tar.gz) |
+| macOS Intel | [mem-macos-x86_64.tar.gz](https://github.com/memovai/memov/releases/latest/download/mem-macos-x86_64.tar.gz) |
+| macOS Apple Silicon | [mem-macos-arm64.tar.gz](https://github.com/memovai/memov/releases/latest/download/mem-macos-arm64.tar.gz) |
+| Windows x86_64 | [mem-windows-x86_64.exe.zip](https://github.com/memovai/memov/releases/latest/download/mem-windows-x86_64.exe.zip) |
+
+</details>
+
+<details>
 <summary><b>ソースから</b></summary>
 
 Python 3.10+ と [uv](https://github.com/astral-sh/uv) が必要：
@@ -201,11 +237,16 @@ mem --help
 
 ## コントリビューター向けインストール
 
-詳細なインストール手順は [docs/installation_for_dev.md](docs/installation_for_dev.md) をご覧ください。
+詳細なインストール手順は [docs/installation_for_dev.md](../installation_for_dev.md) をご覧ください。
 
-## MCPツール
+## アーキテクチャ
 
-これらのツールはMCPサーバーを通じてクライアントで利用可能です：
+MemoVは3層アーキテクチャを採用しています。MemovManagerを中央オーケストレーターとし、MCPサーバーをAIエージェントのアダプターレイヤーとして、オプションのRAGシステムでセマンティック検索を提供します。
+
+![MemoV アーキテクチャ](../images/Arc.png)
+
+<details>
+<summary><b>MCPツール</b></summary>
 
 ### コア操作
 
@@ -244,6 +285,8 @@ mem --help
 
 - `GET /health`
   - "OK"を返す。IDE/エージェントの準備状況チェックに有用。
+
+</details>
 
 ## ライセンス
 

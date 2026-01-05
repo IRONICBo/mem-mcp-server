@@ -1,26 +1,25 @@
 <p align="center">
   <a href="https://github.com/memovai/memov">
-    <img src="docs/images/memov-banner.png" width="800px" alt="MemoV - AI 编程的记忆层">
+    <img src="../images/memov-banner.png" width="800px" alt="MemoV - AI 编程的记忆层">
   </a>
 </p>
 
 <p align="center">
-  <a href="README.md">English</a> | <b>简体中文</b> | <a href="README_JA.md">日本語</a>
+  <a href="../../README.md">English</a> | <a href="README_DE.md">Deutsch</a> | <a href="README_ES.md">Español</a> | <a href="README_FR.md">Français</a> | <a href="README_JA.md">日本語</a> | <a href="README_KO.md">한국어</a> | <a href="README_PT.md">Português</a> | <a href="README_RU.md">Русский</a> | <b>中文</b>
 </p>
 
-# VibeGit🤌：自动管理你的提示词、上下文和代码变化
+<h4 align="center">VibeGit🤌：自动管理你的提示词、上下文和代码变化</h4>
 
 <div align="center">
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Discord](https://img.shields.io/badge/Discord-Join%20Server-7289da?logo=discord&logoColor=white)](https://discord.gg/un54aD7Hug)
+[![DeepWiki](https://img.shields.io/badge/DeepWiki-memovai%2Fmemov-blue.svg?logo=data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiNmZmZmZmYiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cGF0aCBkPSJNNCAxOWguNmMuNC0uMi44LS41IDEuMi0uOCAyLjItMS42IDMuNy0zLjggNC4yLTYuMyIvPjxwYXRoIGQ9Ik0xNC42IDEyLjFjLjYtLjkgMS4zLTEuOCAyLjEtMi42IDEuMS0xLjEgMi40LTEuOCAzLjgtMi4yIDEuMS0uMyAyLjItLjQgMy4zLS4zIi8+PHBhdGggZD0iTTE5LjQgNS4yYy0uOC4xLTEuNi4zLTIuMy41LS41LjItLjkuNC0xLjQuNy0uNC4zLS44LjYtMS4xIDEiLz48cGF0aCBkPSJNNiAxOGMtMS44IDAtMy0xLjUtMy0zIDAtMi4yIDEuOS0zLjUgMi44LTUgLjUtLjggMS45LTIuNyAyLjMtMy43LjYtMS4yIDEuMi0yLjQgMS42LTMuNi4xLS40LjUtLjkuOS0uOS43IDAgLjggMS4yLjggMS4zIDAgMS40LS4zIDIuOC0uNyA0LjEtLjQgMS41LTEuMSAyLjktMS44IDQuMyIvPjwvc3ZnPg==)](https://deepwiki.com/memovai/memov)
 [![Twitter Follow](https://img.shields.io/twitter/follow/ssslvky?style=social)](https://x.com/ssslvky)
 
 </div>
 
-可追溯、Git 驱动的 AI 编程记忆层。提示词、上下文和代码差异**自动版本化** - 这就是 VibeGit!🤌
-
-省去 1000+ 次**手动** commit，你的 .git 依然保持**干净**。
+MemoV 是 AI 编程代理的记忆层，提供**可追溯**、**Git 驱动**的提示词、上下文和代码差异版本控制。它实现了 **VibeGit** - AI 编程会话的自动版本化，支持分支探索、回滚功能，且对标准 .git 仓库**零污染**。
 
 <div align="center">
 
@@ -37,12 +36,12 @@
 
 ## 功能特性
 
-- ⚡ **一键安装 MCP** — 适配任何 AI 编程助手
-- 🧠 **完整上下文** — 每个提示词 → 代理计划 → 代码差异，实时捕获
-- ⏪ **版本控制** — 分支、回滚、重放任何交互
-- 🧼 **保持 Git 干净** — 影子 `.mem` 时间线，零污染 `.git`
-- 🔍 **可视化界面** — 浏览你的 AI 编程历史
-- 🔒 **隐私优先** — 本地存储，无数据库，零开销
+- **一键安装 MCP** — 适配任何 AI 编程助手
+- **VibeGit for Agents** — 自动追踪提示词、上下文和代码差异，无需手动提交
+- **版本控制** — 分支、回滚、重放任何交互
+- **保持 Git 干净** — 影子 `.mem` 时间线，零污染 `.git`
+- **可视化界面** — 在对话中说 "mem ui"，访问 http://localhost:38888 查看
+- **隐私优先** — 本地存储，无数据库，零开销。使用 .memignore 排除文件
 
 ## 快速开始（MCP 安装）
 
@@ -74,7 +73,8 @@ claude mcp add mem-mcp --scope project -- uvx --from git+https://github.com/memo
 codex mcp add mem-mcp -- uvx --from git+https://github.com/memovai/memov.git mem-mcp-launcher stdio $(pwd)
 ```
 
-### VS Code
+<details>
+<summary><b>VS Code</b></summary>
 
 在项目根目录创建 `.vscode/mcp.json`：
 
@@ -96,7 +96,10 @@ codex mcp add mem-mcp -- uvx --from git+https://github.com/memovai/memov.git mem
 }
 ```
 
-### Cursor
+</details>
+
+<details>
+<summary><b>Cursor</b></summary>
 
 进入 **Files > Preferences > Cursor Settings > MCP**，添加：
 
@@ -117,11 +120,10 @@ codex mcp add mem-mcp -- uvx --from git+https://github.com/memovai/memov.git mem
 }
 ```
 
-### Web 界面
+</details>
 
-在对话中说 **"use mem ui"** — 在 `http://localhost:38888` 打开，包含时间线视图、分支过滤、差异查看器和一键跳转到任意快照。
-
-### 启用向量数据库（RAG 模式）
+<details>
+<summary><b>启用向量数据库（RAG 模式）</b> 🚧 WIP</summary>
 
 要启用语义搜索、验证和调试工具，使用 `[rag]` 扩展安装：
 
@@ -134,6 +136,26 @@ claude mcp add mem-mcp --scope project -- uvx --from "git+https://github.com/mem
 ```
 "git+https://github.com/memovai/memov.git[rag]"
 ```
+
+</details>
+
+### 重要提示
+
+**添加规则** — 要在每次交互后自动保存快照，请在你的编程代理中添加规则：
+
+- **Cursor**: Cursor Settings > Rules
+- **Claude Code**: `CLAUDE.md`
+- 或你的 MCP 客户端中的等效设置
+
+示例规则：
+
+```
+After completing any interaction, always call `use mem snap` to save the snapshot.
+```
+
+## Web 界面，就说 Use mem ui🤌
+
+在对话中说 **"use mem ui"** — 在 `http://localhost:38888` 打开，包含时间线视图、分支过滤、差异查看器和一键跳转到任意快照。
 
 ## CLI 安装（可选）
 
@@ -185,6 +207,20 @@ sudo dnf install mem
 </details>
 
 <details>
+<summary><b>直接下载</b></summary>
+
+下载适合你平台的最新版本：
+
+| 平台 | 下载 |
+|------|------|
+| Linux x86_64 | [mem-linux-x86_64.tar.gz](https://github.com/memovai/memov/releases/latest/download/mem-linux-x86_64.tar.gz) |
+| macOS Intel | [mem-macos-x86_64.tar.gz](https://github.com/memovai/memov/releases/latest/download/mem-macos-x86_64.tar.gz) |
+| macOS Apple Silicon | [mem-macos-arm64.tar.gz](https://github.com/memovai/memov/releases/latest/download/mem-macos-arm64.tar.gz) |
+| Windows x86_64 | [mem-windows-x86_64.exe.zip](https://github.com/memovai/memov/releases/latest/download/mem-windows-x86_64.exe.zip) |
+
+</details>
+
+<details>
 <summary><b>从源码安装</b></summary>
 
 需要 Python 3.10+ 和 [uv](https://github.com/astral-sh/uv)：
@@ -201,11 +237,16 @@ mem --help
 
 ## 贡献者安装指南
 
-请参阅 [docs/installation_for_dev.md](docs/installation_for_dev.md) 获取详细安装说明。
+请参阅 [docs/installation_for_dev.md](../installation_for_dev.md) 获取详细安装说明。
 
-## MCP 工具
+## 架构
 
-这些工具可通过 MCP 服务器供客户端使用：
+MemoV 采用三层架构，以 MemovManager 为核心协调器，MCP Server 作为 AI 代理的适配层，以及可选的 RAG 系统用于语义搜索。
+
+![MemoV 架构](../images/Arc.png)
+
+<details>
+<summary><b>MCP 工具</b></summary>
 
 ### 核心操作
 
@@ -244,6 +285,8 @@ mem --help
 
 - `GET /health`
   - 返回 "OK"。用于 IDE/代理就绪检查。
+
+</details>
 
 ## 开源协议
 

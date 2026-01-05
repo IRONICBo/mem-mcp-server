@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <b>English</b> | <a href="README_CN.md">简体中文</a> | <a href="README_JA.md">日本語</a>
+  <b>English</b> | <a href="docs/readme/README_DE.md">Deutsch</a> | <a href="docs/readme/README_ES.md">Español</a> | <a href="docs/readme/README_FR.md">Français</a> | <a href="docs/readme/README_JA.md">日本語</a> | <a href="docs/readme/README_KO.md">한국어</a> | <a href="docs/readme/README_PT.md">Português</a> | <a href="docs/readme/README_RU.md">Русский</a> | <a href="docs/readme/README_CN.md">中文</a>
 </p>
 
 <h4 align="center">VibeGit🤌: Auto-track your prompts, context & code diffs.</h4>
@@ -134,26 +134,8 @@ Go to **Files > Preferences > Cursor Settings > MCP**, then add:
 
 </details>
 
-### Important Tips
-
-**Add a Rule** — To automatically save snapshots after each interaction, add a rule to your coding agents:
-
-- **Cursor**: Cursor Settings > Rules
-- **Claude Code**: `CLAUDE.md`
-- Or the equivalent in your MCP client
-
-Example rule:
-
-```
-After completing any interaction, always call `use mem snap` to save the snapshot.
-```
-
-## Web UI, just say **use mem ui**
-
-Just say **"use mem ui"** in the chat — opens at `http://localhost:38888` with timeline view, branch filtering, diff viewer, and jump to any snapshot.
-
 <details>
-<summary><b>With VectorDB (RAG mode)</b></summary>
+<summary><b>With VectorDB (RAG mode)</b> 🚧 WIP</summary>
 
 To enable semantic search, validation, and debugging tools, install with `[rag]` extras:
 
@@ -168,6 +150,24 @@ claude mcp add mem-mcp --scope project -- uvx --from "git+https://github.com/mem
 ```
 
 </details>
+
+### Important Tips
+
+**Add a Rule** — To automatically save snapshots after each interaction, add a rule to your coding agents:
+
+- **Cursor**: Cursor Settings > Rules
+- **Claude Code**: `CLAUDE.md`
+- Or the equivalent in your MCP client
+
+Example rule:
+
+```
+After completing any interaction, always call `use mem snap` to save the snapshot.
+```
+
+## Web UI, Just Say Use mem ui🤌
+
+Just say **"use mem ui"** in the chat — opens at `http://localhost:38888` with timeline view, branch filtering, diff viewer, and jump to any snapshot.
 
 ## CLI Installation (Optional)
 
@@ -271,9 +271,14 @@ mem --help
 
 Please see [docs/installation_for_dev.md](docs/installation_for_dev.md) for detailed installation instructions.
 
-## MCP Tools
+## Architecture
 
-These are available to MCP clients through the server:
+MemoV follows a three-tier architecture with MemovManager as the central orchestrator, the MCP Server as an adapter layer for AI agents, and an optional RAG system for semantic search.
+
+![MemoV Architecture](docs/images/Arc.png)
+
+<details>
+<summary><b>MCP Tools</b></summary>
 
 ### Core Operations
 
@@ -312,6 +317,8 @@ These tools are only available when installed with `[rag]` extras.
 
 - `GET /health`
   - Returns "OK". Useful for IDE/agent readiness checks.
+
+</details>
 
 
 ## License
