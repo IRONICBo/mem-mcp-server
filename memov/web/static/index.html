@@ -1696,10 +1696,17 @@ Files: ${(node.files || []).join(', ') || 'None'}
                             matchField = 'response';
                             matchText = node.response;
                         }
-                        // Check files
-                        else if (node.files && node.files.some(f => regex.test(f))) {
-                            matchField = 'files';
-                            matchText = node.files.find(f => regex.test(f));
+                        // Check changed files only (not unchanged tracked files)
+                        else if (node.files && node.diff) {
+                            const changedFiles = node.files.filter(f => {
+                                const fileDiff = node.diff[f];
+                                return fileDiff && fileDiff.status !== 'unchanged';
+                            });
+                            const matchedFile = changedFiles.find(f => regex.test(f));
+                            if (matchedFile) {
+                                matchField = 'files';
+                                matchText = matchedFile;
+                            }
                         }
 
                         if (matchField) {
