@@ -527,8 +527,43 @@
 
         .tree-node:hover circle {
             stroke: #333;
-            transform: scale(1.2);
-            transform-origin: center;
+        }
+
+        .tree-node {
+            cursor: pointer;
+        }
+
+        /* Tooltip for prompt preview */
+        .tree-tooltip {
+            position: fixed;
+            background: #333;
+            color: #fff;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            max-width: 300px;
+            word-wrap: break-word;
+            white-space: pre-wrap;
+            z-index: 1000;
+            pointer-events: none;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            opacity: 0;
+            transition: opacity 0.15s;
+        }
+
+        .tree-tooltip.visible {
+            opacity: 1;
+        }
+
+        .tree-tooltip::after {
+            content: '';
+            position: absolute;
+            bottom: -6px;
+            left: 50%;
+            transform: translateX(-50%);
+            border-width: 6px 6px 0 6px;
+            border-style: solid;
+            border-color: #333 transparent transparent transparent;
         }
 
         .tree-node.head circle {
@@ -595,6 +630,9 @@
             </div>
         </div>
     </div>
+
+    <!-- Tooltip for prompt preview -->
+    <div class="tree-tooltip" id="tree-tooltip"></div>
 
     <!-- Diff Modal -->
     <div class="modal" id="diff-modal">
@@ -701,6 +739,13 @@
 
                 // Default to ALL tree view
                 showAllTree();
+
+                // Defer tooltip initialization - render nodes first
+                if (window.requestIdleCallback) {
+                    requestIdleCallback(() => initTreeTooltip());
+                } else {
+                    setTimeout(() => initTreeTooltip(), 0);
+                }
             } catch (error) {
                 console.error('Failed to load data:', error);
                 document.getElementById('timeline').innerHTML =
@@ -1094,6 +1139,59 @@
                     </svg>
                 </div>
             `;
+
+        }
+
+        function updateTooltipPosition(e, tooltip) {
+            const tooltipRect = tooltip.getBoundingClientRect();
+            let x = e.clientX - tooltipRect.width / 2;
+            let y = e.clientY - tooltipRect.height - 15;
+
+            // Keep tooltip within viewport
+            if (x < 10) x = 10;
+            if (x + tooltipRect.width > window.innerWidth - 10) {
+                x = window.innerWidth - tooltipRect.width - 10;
+            }
+            if (y < 10) {
+                y = e.clientY + 20; // Show below cursor if no room above
+            }
+
+            tooltip.style.left = x + 'px';
+            tooltip.style.top = y + 'px';
+        }
+
+        // Event delegation for tooltip - only 3 listeners instead of 3*N
+        function initTreeTooltip() {
+            const tooltip = document.getElementById('tree-tooltip');
+            const container = document.getElementById('timeline');
+
+            container.addEventListener('mouseover', (e) => {
+                const nodeEl = e.target.closest('.tree-node');
+                if (!nodeEl) return;
+
+                const nodeId = nodeEl.getAttribute('data-id');
+                const node = graphData?.nodes?.find(n => n.id === nodeId);
+                if (!node) return;
+
+                const prompt = node.prompt || 'No prompt';
+                const displayText = prompt.length > 100 ? prompt.substring(0, 100) + '...' : prompt;
+                tooltip.textContent = displayText;
+                tooltip.classList.add('visible');
+                updateTooltipPosition(e, tooltip);
+            });
+
+            container.addEventListener('mousemove', (e) => {
+                if (tooltip.classList.contains('visible')) {
+                    updateTooltipPosition(e, tooltip);
+                }
+            });
+
+            container.addEventListener('mouseout', (e) => {
+                const nodeEl = e.target.closest('.tree-node');
+                if (nodeEl) {
+                    tooltip.classList.remove('visible');
+                }
+            });
         }
 
         function toggleNodeFromTree(nodeId) {
