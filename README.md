@@ -85,7 +85,8 @@ Run in your project root directory:
 codex mcp add mem-mcp -- uvx --from git+https://github.com/memovai/memov.git mem-mcp-launcher stdio $(pwd)
 ```
 
-### VS Code
+<details>
+<summary><b>VS Code</b></summary>
 
 Create `.vscode/mcp.json` in your project root:
 
@@ -107,7 +108,10 @@ Create `.vscode/mcp.json` in your project root:
 }
 ```
 
-### Cursor
+</details>
+
+<details>
+<summary><b>Cursor</b></summary>
 
 Go to **Files > Preferences > Cursor Settings > MCP**, then add:
 
@@ -128,11 +132,28 @@ Go to **Files > Preferences > Cursor Settings > MCP**, then add:
 }
 ```
 
-### Web UI
+</details>
+
+### Important Tips
+
+**Add a Rule** — To automatically save snapshots after each interaction, add a rule to your coding agents:
+
+- **Cursor**: Cursor Settings > Rules
+- **Claude Code**: `CLAUDE.md`
+- Or the equivalent in your MCP client
+
+Example rule:
+
+```
+After completing any interaction, always call `use mem snap` to save the snapshot.
+```
+
+## Web UI, just say **use mem ui**
 
 Just say **"use mem ui"** in the chat — opens at `http://localhost:38888` with timeline view, branch filtering, diff viewer, and jump to any snapshot.
 
-### With VectorDB (RAG mode)
+<details>
+<summary><b>With VectorDB (RAG mode)</b></summary>
 
 To enable semantic search, validation, and debugging tools, install with `[rag]` extras:
 
@@ -145,6 +166,8 @@ claude mcp add mem-mcp --scope project -- uvx --from "git+https://github.com/mem
 ```
 "git+https://github.com/memovai/memov.git[rag]"
 ```
+
+</details>
 
 ## CLI Installation (Optional)
 
