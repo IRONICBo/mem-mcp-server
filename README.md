@@ -19,12 +19,7 @@
 
 </div>
 
-Traceable, Git-powered memory for AI coding. Prompts, context, and code diffs **auto versioned** - it's VibeGit!🤌
-
-Persistent. Rollback anytime, branch freely, explore different solutions.
-
-Avoid 1000+ **manual** commits, your **.git** still stays clean.
-
+MemoV is a memory layer for AI coding agents that provides **traceable**, **Git-powered** version control for prompts, context, and code diffs. It enables **VibeGit** - automatic versioning of AI coding sessions with branch exploration, rollback capabilities, and **zero pollution** to the standard .git repository.
 
 <div align="center">
 
@@ -52,12 +47,12 @@ Avoid 1000+ **manual** commits, your **.git** still stays clean.
 
 ## Features
 
-- ⚡ **One-click MCP** — Works with any AI coding agent
-- 🧠 **Full context** — Every prompt → agent plan → code diff is captured in real time
-- ⏪ **Version Control** — Branch, rollback, replay any interaction
-- 🧼 **Keep Git Clean** — Shadow `.mem` timeline, zero pollution on `.git` 
-- 🔍 **Visual UI** — Browse your AI coding history at http://localhost:38888
-- 🔒 **Private-first** — Local, no database, no overhead. Use .memignore to exclude
+- **One-click MCP**: Works with any AI coding agent
+- **VibeGit for Agents**: Auto-tracks prompts, context, and code diffs without manual commits
+- **Version Control**: Branch, rollback, replay any interaction
+- **Keep Git Clean**: Shadow `.mem` timeline, zero pollution on `.git` 
+- **Visual UI**: Say "mem ui" in chat, and view at http://localhost:38888
+- **Private-first** — Local, no database, no overhead. Use .memignore to exclude
 
 
 ## Quick Start (MCP Installation)
