@@ -55,6 +55,9 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 
 # Windows
 powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+
+# Git installieren (falls nicht installiert)
+winget install --id Git.Git -e --source winget
 ```
 
 ### Claude Code
