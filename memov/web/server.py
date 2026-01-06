@@ -6,10 +6,12 @@ import traceback
 from pathlib import Path
 from typing import Optional
 
+import httpx
 import uvicorn
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
+from pydantic import BaseModel
 
 from memov.core.manager import MemovManager, MemStatus
 
@@ -17,6 +19,58 @@ LOGGER = logging.getLogger(__name__)
 
 # Global project path (set when server starts)
 _project_path: Optional[str] = None
+
+
+# AI Search request model (defined at module level for proper serialization)
+class AISearchRequest(BaseModel):
+    api_key: str
+    query: str
+    provider: str = "openai"  # "anthropic" or "openai"
+
+
+async def _call_anthropic(api_key: str, system_prompt: str, user_prompt: str) -> str:
+    """Call Anthropic Claude API."""
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        response = await client.post(
+            "https://api.anthropic.com/v1/messages",
+            headers={
+                "x-api-key": api_key,
+                "anthropic-version": "2023-06-01",
+                "content-type": "application/json",
+            },
+            json={
+                "model": "claude-sonnet-4-20250514",
+                "max_tokens": 1024,
+                "system": system_prompt,
+                "messages": [{"role": "user", "content": user_prompt}],
+            },
+        )
+        response.raise_for_status()
+        data = response.json()
+        return data["content"][0]["text"]
+
+
+async def _call_openai(api_key: str, system_prompt: str, user_prompt: str) -> str:
+    """Call OpenAI API."""
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        response = await client.post(
+            "https://api.openai.com/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "model": "gpt-4o-mini",
+                "max_tokens": 1024,
+                "messages": [
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+            },
+        )
+        response.raise_for_status()
+        data = response.json()
+        return data["choices"][0]["message"]["content"]
 
 
 def create_app(project_path: str) -> "FastAPI":
@@ -182,6 +236,51 @@ def create_app(project_path: str) -> "FastAPI":
             raise HTTPException(status_code=400, detail=f"Jump failed: {status}")
 
         return {"status": "success", "new_branch": new_branch}
+
+    @app.post("/api/search/ai")
+    async def ai_search(request: AISearchRequest):
+        """Search history using AI model."""
+        manager = MemovManager(project_path=_project_path)
+        if manager.check() is not MemStatus.SUCCESS:
+            raise HTTPException(status_code=400, detail="Memov not initialized")
+
+        # Get history data
+        history = manager.get_history(limit=50)  # Limit to recent 50 commits
+
+        # Build compact history summary for AI (only prompt/commit message)
+        history_text = []
+        for entry in history:
+            prompt = entry["prompt"] or "N/A"
+            summary = f"[{entry['short_hash']}] {entry['branch']} | {prompt[:200]}"
+            history_text.append(summary)
+
+        history_context = "\n".join(history_text)
+
+        # Build AI prompt
+        system_prompt = """You are an AI assistant helping users search their code history.
+You will be given a list of commits with their prompts/messages.
+Answer the user's question based on this history. Be concise."""
+
+        user_prompt = f"""Commit history (format: [hash] branch | prompt):
+
+{history_context}
+
+Question: {request.query}"""
+
+        try:
+            if request.provider == "anthropic":
+                response = await _call_anthropic(request.api_key, system_prompt, user_prompt)
+            elif request.provider == "openai":
+                response = await _call_openai(request.api_key, system_prompt, user_prompt)
+            else:
+                raise HTTPException(status_code=400, detail=f"Unknown provider: {request.provider}")
+
+            return {"response": response}
+        except httpx.HTTPStatusError as e:
+            raise HTTPException(status_code=e.response.status_code, detail=f"API error: {e.response.text}")
+        except Exception as e:
+            LOGGER.error(f"AI search error: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
 
     # Serve static files
     static_dir = Path(__file__).parent / "static"
