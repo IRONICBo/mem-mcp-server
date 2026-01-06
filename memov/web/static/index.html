@@ -118,12 +118,440 @@
             flex: 1;
             overflow-y: auto;
             padding: 24px;
+            position: relative;
         }
 
         .timeline-container {
             position: relative;
             max-width: 900px;
             margin: 0 auto;
+        }
+
+        /* Inline Search Box - DeepWiki Style */
+        .inline-search {
+            background: rgba(245, 245, 247, 0.85);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            border-radius: 12px;
+            padding: 0;
+            margin-bottom: 20px;
+            margin-left: auto;
+            max-width: 420px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+            overflow: visible;
+            position: relative;
+            z-index: 100;
+        }
+
+        .search-input-area {
+            padding: 16px 16px 12px 16px;
+            background: rgba(245, 245, 247, 0.95);
+            border-radius: 12px 12px 0 0;
+        }
+
+        .search-input-area input {
+            width: 100%;
+            border: none;
+            background: transparent;
+            font-size: 15px;
+            color: #333;
+            outline: none;
+            line-height: 1.5;
+        }
+
+        .search-input-area input::placeholder {
+            color: #999;
+        }
+
+        .search-bottom-bar {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 12px 10px 12px;
+            border-top: 1px solid rgba(0, 0, 0, 0.05);
+            overflow: visible;
+            position: relative;
+            background: rgba(245, 245, 247, 0.95);
+            border-radius: 0 0 12px 12px;
+        }
+
+        .search-mode-dropdown {
+            position: relative;
+            z-index: 9999;
+        }
+
+        .search-mode-trigger {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 10px;
+            background: transparent;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            color: #555;
+            transition: background 0.15s;
+        }
+
+        .search-mode-trigger:hover {
+            background: rgba(0, 0, 0, 0.05);
+        }
+
+        .search-mode-trigger svg {
+            width: 14px;
+            height: 14px;
+        }
+
+        .search-mode-trigger .chevron {
+            width: 10px;
+            height: 10px;
+            color: #999;
+            transition: transform 0.2s;
+        }
+
+        .search-mode-dropdown.open .chevron {
+            transform: rotate(180deg);
+        }
+
+        .search-mode-menu {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            margin-top: 6px;
+            background: #fff;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+            min-width: 220px;
+            overflow: visible;
+            z-index: 9999;
+        }
+
+        .search-mode-dropdown.open .search-mode-menu {
+            display: block;
+        }
+
+        .search-mode-option {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 10px 14px;
+            cursor: pointer;
+            transition: background 0.1s;
+        }
+
+        .search-mode-option:hover {
+            background: #f5f5f5;
+        }
+
+        .search-mode-option.active {
+            background: #f0f0f0;
+        }
+
+        .search-mode-option .icon {
+            width: 18px;
+            height: 18px;
+            color: #666;
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+
+        .search-mode-option .text {
+            flex: 1;
+        }
+
+        .search-mode-option .title {
+            font-size: 13px;
+            font-weight: 500;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .search-mode-option .title .check {
+            color: #333;
+            width: 14px;
+            height: 14px;
+        }
+
+        .search-mode-option .desc {
+            font-size: 11px;
+            color: #888;
+            margin-top: 2px;
+        }
+
+        .ai-config {
+            display: none;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .ai-config.show {
+            display: flex;
+        }
+
+        .search-bottom-bar .spacer {
+            flex: 1;
+        }
+
+        .ai-config input {
+            flex: 1;
+            max-width: 140px;
+            padding: 5px 8px;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            border-radius: 6px;
+            font-size: 11px;
+            background: rgba(255, 255, 255, 0.8);
+            outline: none;
+        }
+
+        .ai-config input:focus {
+            border-color: #333;
+        }
+
+        .ai-config select {
+            padding: 5px 8px;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            border-radius: 6px;
+            font-size: 11px;
+            background: rgba(255, 255, 255, 0.8);
+            cursor: pointer;
+            outline: none;
+        }
+
+        .search-submit-btn {
+            width: 32px;
+            height: 32px;
+            border: none;
+            background: rgba(0, 0, 0, 0.06);
+            border-radius: 8px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: #666;
+            flex: 0 0 32px;
+            padding: 0;
+        }
+
+        .search-submit-btn:hover {
+            background: #333;
+            color: #fff;
+        }
+
+        .search-submit-btn svg {
+            width: 16px;
+            height: 16px;
+            pointer-events: none;
+        }
+
+        .search-submit-btn:disabled {
+            pointer-events: none;
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Search Results Area - Glass style floating dropdown */
+        .search-results-area {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            margin-top: 4px;
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.92);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            border-radius: 10px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            max-height: 350px;
+            overflow: hidden;
+            z-index: 1000;
+        }
+
+        .search-results-area.show {
+            display: block;
+        }
+
+        .search-results-area .ai-response {
+            font-size: 13px;
+            line-height: 1.6;
+            color: #333;
+        }
+
+        .search-results-area .ai-header {
+            font-size: 11px;
+            color: #888;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .search-results-area .close-btn {
+            background: none;
+            border: none;
+            color: #999;
+            cursor: pointer;
+            font-size: 16px;
+            padding: 0 4px;
+        }
+
+        .search-results-area .close-btn:hover {
+            color: #333;
+        }
+
+        .search-results-area .loading {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #666;
+            font-size: 13px;
+        }
+
+        .search-results-area .loading-spinner {
+            width: 16px;
+            height: 16px;
+            border: 2px solid #ddd;
+            border-top-color: #333;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .search-results-area .error {
+            color: #c62828;
+            font-size: 13px;
+        }
+
+        /* Search Result Items */
+        .search-result-list {
+            max-height: 280px;
+            overflow-y: auto;
+        }
+
+        .search-result-item {
+            padding: 10px 12px;
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            border-radius: 8px;
+            margin-bottom: 8px;
+            background: rgba(255, 255, 255, 0.6);
+            cursor: pointer;
+            transition: background 0.15s, border-color 0.15s;
+        }
+
+        .search-result-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .search-result-item:hover {
+            background: rgba(255, 255, 255, 0.9);
+            border-color: rgba(0, 0, 0, 0.15);
+        }
+
+        .search-result-item .item-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 4px;
+        }
+
+        .search-result-item .item-hash {
+            font-family: monospace;
+            font-size: 12px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .search-result-item .item-type {
+            font-size: 10px;
+            padding: 2px 6px;
+            background: #eee;
+            border-radius: 4px;
+            color: #666;
+        }
+
+        .search-result-item .item-branch {
+            font-size: 10px;
+            padding: 2px 6px;
+            background: #d4edda;
+            border-radius: 4px;
+            color: #155724;
+        }
+
+        .search-result-item .item-time {
+            font-size: 11px;
+            color: #999;
+            margin-left: auto;
+        }
+
+        .search-result-item .item-prompt {
+            font-size: 12px;
+            color: #555;
+            margin-bottom: 6px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .search-result-item .item-files {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+
+        .search-result-item .item-file {
+            font-size: 10px;
+            padding: 2px 6px;
+            background: rgba(0, 0, 0, 0.05);
+            border-radius: 4px;
+            color: #666;
+        }
+
+        .search-result-item .item-file.changed {
+            background: #fff3cd;
+            color: #856404;
+        }
+
+        .search-result-item .item-file.matched {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .search-results-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+        }
+
+        .search-results-header .count {
+            font-size: 12px;
+            color: #666;
+        }
+
+        /* Node highlight for search results - Green */
+        .node-card.search-highlight {
+            border-color: #22c55e !important;
+            background: #f0fdf4 !important;
+            box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.2) !important;
+        }
+
+        .tree-node.search-highlight circle {
+            stroke: #22c55e !important;
+            stroke-width: 3 !important;
+            fill: #f0fdf4 !important;
         }
 
         /* Node */
@@ -830,13 +1258,6 @@
             <h1>MemoV Timeline</h1>
         </div>
         <div class="header-right">
-            <button class="search-btn" onclick="openSearchModal()" title="Search">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="11" cy="11" r="8"></circle>
-                    <path d="m21 21-4.35-4.35"></path>
-                </svg>
-                Search
-            </button>
             <div class="header-info" id="branch-info">Loading...</div>
         </div>
     </div>
@@ -853,6 +1274,67 @@
         </div>
 
         <div class="timeline">
+            <!-- Inline Search Box - DeepWiki Style -->
+            <div class="inline-search" id="inline-search">
+                <div class="search-input-area">
+                    <input type="text" id="inline-search-input" placeholder="Search all branches...">
+                </div>
+                <div class="search-bottom-bar">
+                    <div class="search-mode-dropdown" id="search-mode-dropdown">
+                        <button class="search-mode-trigger" onclick="toggleSearchModeMenu()">
+                            <svg class="mode-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                            </svg>
+                            <span id="current-mode-text">Regex</span>
+                            <svg class="chevron" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="m6 9 6 6 6-6"/>
+                            </svg>
+                        </button>
+                        <div class="search-mode-menu">
+                            <div class="search-mode-option active" data-mode="regex" onclick="selectSearchMode('regex')">
+                                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                                </svg>
+                                <div class="text">
+                                    <div class="title">
+                                        Regex
+                                        <svg class="check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                            <path d="M20 6L9 17l-5-5"/>
+                                        </svg>
+                                    </div>
+                                    <div class="desc">Quick pattern matching search</div>
+                                </div>
+                            </div>
+                            <div class="search-mode-option" data-mode="ai" onclick="selectSearchMode('ai')">
+                                <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="3"/>
+                                    <path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+                                </svg>
+                                <div class="text">
+                                    <div class="title">AI Search</div>
+                                    <div class="desc">Natural language search with AI</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="ai-config" id="ai-config">
+                        <input type="password" id="inline-api-key" placeholder="API Key">
+                        <select id="inline-ai-provider">
+                            <option value="anthropic">Claude</option>
+                            <option value="openai">OpenAI</option>
+                        </select>
+                    </div>
+                    <div class="spacer"></div>
+                    <button class="search-submit-btn" onclick="doInlineSearch()" title="Search">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M5 12h14M12 5l7 7-7 7"/>
+                        </svg>
+                    </button>
+                </div>
+                <!-- Search Results Area -->
+                <div class="search-results-area" id="search-results-area"></div>
+            </div>
+
             <div class="timeline-container" id="timeline">
                 <div class="loading">Loading commits...</div>
             </div>
@@ -924,6 +1406,9 @@
         let nodeBranch = {}; // Maps commit hash to the branch it belongs to
         let expandedNode = null;
         let viewMode = 'branch'; // 'branch' | 'all'
+        let currentBranch = null; // Currently selected branch (null = all)
+        let searchMode = 'regex'; // 'regex' | 'ai'
+        let highlightedNodes = []; // Currently highlighted node IDs
 
         // Build nodeBranch mapping: determine which branch each commit belongs to
         // Shared commits belong to the "parent" branch (main first, then alphabetically)
@@ -1220,6 +1705,7 @@
 
         function showAllTree() {
             viewMode = 'all';
+            currentBranch = null;
 
             // Update button states
             document.getElementById('view-all-btn').classList.add('active');
@@ -1229,6 +1715,12 @@
 
             // Update header
             document.getElementById('branch-info').textContent = 'All Branches';
+
+            // Update search placeholder
+            updateSearchPlaceholder();
+
+            // Clear any search highlights
+            clearHighlights();
 
             // Render tree view
             renderTreeView();
@@ -1240,7 +1732,15 @@
                 renderTimeline(graphData);
             }
             viewMode = 'branch';
+            currentBranch = branchName;
             document.getElementById('view-all-btn').classList.remove('active');
+
+            // Update search placeholder
+            updateSearchPlaceholder();
+
+            // Clear any search highlights
+            clearHighlights();
+
             filterBranch(branchName);
         }
 
@@ -1833,6 +2333,294 @@ Files: ${(node.files || []).join(', ') || 'None'}
 
         document.getElementById('ai-query-input').addEventListener('keydown', (e) => {
             if (e.key === 'Enter') doAISearch();
+        });
+
+        // ============ Inline Search Functions (DeepWiki Style) ============
+
+        function toggleSearchModeMenu() {
+            const dropdown = document.getElementById('search-mode-dropdown');
+            dropdown.classList.toggle('open');
+        }
+
+        function selectSearchMode(mode) {
+            searchMode = mode;
+
+            // Update dropdown trigger text
+            document.getElementById('current-mode-text').textContent = mode === 'regex' ? 'Regex' : 'AI Search';
+
+            // Update menu options
+            document.querySelectorAll('.search-mode-option').forEach(opt => {
+                const isActive = opt.dataset.mode === mode;
+                opt.classList.toggle('active', isActive);
+                // Show/hide check mark
+                const check = opt.querySelector('.check');
+                if (check) {
+                    check.style.display = isActive ? 'inline' : 'none';
+                }
+            });
+
+            // Show/hide AI config
+            document.getElementById('ai-config').classList.toggle('show', mode === 'ai');
+
+            // Close dropdown
+            document.getElementById('search-mode-dropdown').classList.remove('open');
+        }
+
+        function updateSearchPlaceholder() {
+            const input = document.getElementById('inline-search-input');
+            if (input) {
+                input.placeholder = currentBranch
+                    ? `Search in ${currentBranch}...`
+                    : 'Search all branches...';
+            }
+        }
+
+        function clearHighlights() {
+            highlightedNodes.forEach(nodeId => {
+                // Clear timeline view highlights
+                const card = document.getElementById(`card-${nodeId}`);
+                if (card) card.classList.remove('search-highlight');
+
+                // Clear tree view highlights
+                const treeNode = document.querySelector(`.tree-node[data-id="${nodeId}"]`);
+                if (treeNode) treeNode.classList.remove('search-highlight');
+            });
+            highlightedNodes = [];
+        }
+
+        function highlightSearchResults(matchedNodeIds) {
+            clearHighlights();
+            highlightedNodes = matchedNodeIds;
+
+            matchedNodeIds.forEach(nodeId => {
+                // Highlight in timeline view
+                const card = document.getElementById(`card-${nodeId}`);
+                if (card) card.classList.add('search-highlight');
+
+                // Highlight in tree view
+                const treeNode = document.querySelector(`.tree-node[data-id="${nodeId}"]`);
+                if (treeNode) treeNode.classList.add('search-highlight');
+            });
+        }
+
+        function getSearchableNodes() {
+            if (!graphData || !graphData.nodes) return [];
+
+            // If viewing a specific branch, only search nodes in that branch
+            if (currentBranch) {
+                return graphData.nodes.filter(node => nodeBranch[node.id] === currentBranch);
+            }
+            return graphData.nodes;
+        }
+
+        async function doInlineSearch() {
+            const query = document.getElementById('inline-search-input').value.trim();
+            if (!query) {
+                clearHighlights();
+                return;
+            }
+
+            if (searchMode === 'ai') {
+                await doInlineAISearch(query);
+            } else {
+                doInlineRegexSearch(query);
+            }
+        }
+
+        function doInlineRegexSearch(query) {
+            try {
+                const regex = new RegExp(query, 'i');
+                const searchableNodes = getSearchableNodes();
+                const matchedNodes = [];
+
+                searchableNodes.forEach(node => {
+                    let matched = false;
+                    let matchedFiles = [];
+
+                    // Check branch
+                    if (node.branch && regex.test(node.branch)) matched = true;
+                    // Check commit hash
+                    else if (regex.test(node.id) || regex.test(node.short_hash)) matched = true;
+                    // Check prompt
+                    else if (node.prompt && regex.test(node.prompt)) matched = true;
+                    // Check response
+                    else if (node.response && regex.test(node.response)) matched = true;
+                    // Check changed files only (not unchanged)
+                    else if (node.files && node.diff) {
+                        const changedFiles = node.files.filter(f => {
+                            const fileDiff = node.diff[f];
+                            return fileDiff && fileDiff.status !== 'unchanged';
+                        });
+                        matchedFiles = changedFiles.filter(f => regex.test(f));
+                        if (matchedFiles.length > 0) matched = true;
+                    }
+
+                    if (matched) {
+                        matchedNodes.push({ ...node, matchedFiles });
+                    }
+                });
+
+                const matchedIds = matchedNodes.map(n => n.id);
+                highlightSearchResults(matchedIds);
+
+                // Show results list
+                if (matchedNodes.length > 0) {
+                    const itemsHtml = matchedNodes.slice(0, 20).map(node => {
+                        const changedFiles = node.files && node.diff
+                            ? node.files.filter(f => node.diff[f] && node.diff[f].status !== 'unchanged').slice(0, 4)
+                            : [];
+                        const filesHtml = changedFiles.map(f => {
+                            const isMatched = node.matchedFiles && node.matchedFiles.includes(f);
+                            return `<span class="item-file ${isMatched ? 'matched' : 'changed'}">${escapeHtml(f.split('/').pop())}</span>`;
+                        }).join('');
+                        const moreCount = (node.files && node.diff)
+                            ? node.files.filter(f => node.diff[f] && node.diff[f].status !== 'unchanged').length - 4
+                            : 0;
+
+                        return `
+                            <div class="search-result-item" onclick="scrollToNode('${node.id}')">
+                                <div class="item-header">
+                                    <span class="item-hash">${node.short_hash || node.id.slice(0, 7)}</span>
+                                    <span class="item-type">${node.type || 'SNAP'}</span>
+                                    ${node.branch ? `<span class="item-branch">${escapeHtml(node.branch)}</span>` : ''}
+                                </div>
+                                <div class="item-prompt">${escapeHtml(node.prompt || 'No prompt')}</div>
+                                <div class="item-files">
+                                    ${filesHtml}
+                                    ${moreCount > 0 ? `<span class="item-file">+${moreCount}</span>` : ''}
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+
+                    showSearchResults(`
+                        <div class="search-results-header">
+                            <span class="count">${matchedNodes.length} match${matchedNodes.length > 1 ? 'es' : ''}</span>
+                            <button class="close-btn" onclick="hideSearchResults()" title="Close">&times;</button>
+                        </div>
+                        <div class="search-result-list">${itemsHtml}</div>
+                    `);
+                } else {
+                    showSearchResults(`
+                        <div class="search-results-header">
+                            <span class="count">No matches found</span>
+                            <button class="close-btn" onclick="hideSearchResults()" title="Close">&times;</button>
+                        </div>
+                    `);
+                }
+            } catch (e) {
+                console.error('Invalid regex:', e.message);
+                showSearchResults(`<div class="error">Invalid regex: ${escapeHtml(e.message)}</div>`);
+            }
+        }
+
+        function scrollToNode(nodeId) {
+            hideSearchResults();
+            if (viewMode === 'all') {
+                const treeNode = document.querySelector(`.tree-node[data-id="${nodeId}"]`);
+                if (treeNode) {
+                    treeNode.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            } else {
+                const nodeElement = document.querySelector(`.node[data-id="${nodeId}"]`);
+                if (nodeElement) {
+                    nodeElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }
+        }
+
+        function showSearchResults(content) {
+            const area = document.getElementById('search-results-area');
+            area.innerHTML = content;
+            area.classList.add('show');
+        }
+
+        function hideSearchResults() {
+            const area = document.getElementById('search-results-area');
+            area.classList.remove('show');
+            area.innerHTML = '';
+        }
+
+        function setSearchLoading(loading) {
+            const btn = document.querySelector('.search-submit-btn');
+            btn.disabled = loading;
+        }
+
+        async function doInlineAISearch(query) {
+            const apiKey = document.getElementById('inline-api-key').value.trim();
+            const provider = document.getElementById('inline-ai-provider').value;
+
+            if (!apiKey) {
+                showSearchResults('<div class="error">Please enter your API key</div>');
+                return;
+            }
+
+            // Show loading state
+            setSearchLoading(true);
+            showSearchResults(`
+                <div class="loading">
+                    <div class="loading-spinner"></div>
+                    <span>AI is analyzing your history...</span>
+                </div>
+            `);
+
+            try {
+                const res = await fetch('/api/search/ai', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        api_key: apiKey,
+                        query: query,
+                        provider: provider
+                    })
+                });
+
+                const data = await res.json();
+
+                if (!res.ok) {
+                    throw new Error(data.detail || 'Search failed');
+                }
+
+                // Show AI response in results area
+                const providerName = provider === 'anthropic' ? 'Claude' : 'OpenAI';
+                showSearchResults(`
+                    <div class="ai-header">
+                        <span>AI Response (${providerName})</span>
+                        <button class="close-btn" onclick="hideSearchResults()" title="Close">&times;</button>
+                    </div>
+                    <div class="ai-response">${escapeHtml(data.response)}</div>
+                `);
+            } catch (e) {
+                showSearchResults(`
+                    <div class="ai-header">
+                        <span>Error</span>
+                        <button class="close-btn" onclick="hideSearchResults()" title="Close">&times;</button>
+                    </div>
+                    <div class="error">${escapeHtml(e.message)}</div>
+                `);
+            } finally {
+                setSearchLoading(false);
+            }
+        }
+
+        // Handle Enter key in inline search
+        document.getElementById('inline-search-input').addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') doInlineSearch();
+        });
+
+        // Clear highlights when input is cleared
+        document.getElementById('inline-search-input').addEventListener('input', (e) => {
+            if (!e.target.value.trim()) {
+                clearHighlights();
+            }
+        });
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            const dropdown = document.getElementById('search-mode-dropdown');
+            if (dropdown && !dropdown.contains(e.target)) {
+                dropdown.classList.remove('open');
+            }
         });
 
         // Initialize
