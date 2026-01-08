@@ -459,6 +459,11 @@
             border-color: rgba(0, 0, 0, 0.15);
         }
 
+        .search-result-item.selected {
+            background: #e8f5e9;
+            border-color: #4caf50;
+        }
+
         .search-result-item .item-header {
             display: flex;
             align-items: center;
@@ -1436,8 +1441,8 @@
                     <div class="ai-config" id="ai-config">
                         <input type="password" id="inline-api-key" placeholder="API Key">
                         <select id="inline-ai-provider">
-                            <option value="anthropic">Claude</option>
                             <option value="openai">OpenAI</option>
+                            <option value="anthropic">Claude</option>
                         </select>
                     </div>
                     <div class="spacer"></div>
@@ -1510,8 +1515,8 @@
                     <div class="search-input-group">
                         <input type="password" id="api-key-input" placeholder="Enter your API key (Claude/OpenAI)" class="search-input api-key-input">
                         <select id="ai-provider" class="search-select">
-                            <option value="anthropic">Claude</option>
                             <option value="openai">OpenAI</option>
+                            <option value="anthropic">Claude</option>
                         </select>
                     </div>
                     <div class="search-input-group">
@@ -2739,7 +2744,12 @@
         }
 
         function scrollToNode(nodeId) {
-            hideSearchResults();
+            // Highlight selected search result item
+            document.querySelectorAll('.search-result-item').forEach(item => {
+                item.classList.remove('selected');
+            });
+            event.currentTarget.classList.add('selected');
+
             if (viewMode === 'all') {
                 const treeNode = document.querySelector(`.tree-node[data-id="${nodeId}"]`);
                 if (treeNode) {
@@ -2749,6 +2759,8 @@
                 const nodeElement = document.querySelector(`.node[data-id="${nodeId}"]`);
                 if (nodeElement) {
                     nodeElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    // Expand the card
+                    toggleNode(nodeId);
                 }
             }
         }

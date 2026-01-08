@@ -871,12 +871,18 @@ class MemovManager:
         except Exception as e:
             LOGGER.error(f"Error showing history in memov repo: {e}")
 
-    def get_history(self, limit: int = 20, include_diff: bool = True) -> list[dict]:
+    def get_history(
+        self, limit: int = 20, include_diff: bool = True, diff_mode: str = "full"
+    ) -> list[dict]:
         """Get the history of all branches in the memov bare repo as structured data.
 
         Args:
             limit: Maximum number of commits to return (default: 20)
-            include_diff: Whether to include diff/hunk information for each commit (default: True)
+            include_diff: Whether to include diff information for each commit (default: True)
+            diff_mode: How much diff info to include (default: "full")
+                - "full": Complete diff with hunks (slowest)
+                - "status": Only file status (added/modified/deleted) without hunks (fast)
+                - "none": No diff info (fastest, same as include_diff=False)
 
         Returns:
             List of commit dictionaries with keys:
@@ -950,10 +956,13 @@ class MemovManager:
                 # Get commit details (timestamp, author) using git log
                 commit_info = self._get_commit_info(hash_id)
 
-                # Get diff/hunk information if requested
+                # Get diff information based on diff_mode
                 diff_data = {}
-                if include_diff:
+                effective_diff_mode = diff_mode if include_diff else "none"
+                if effective_diff_mode == "full":
                     diff_data = self._get_commit_diff_by_file(hash_id)
+                elif effective_diff_mode == "status":
+                    diff_data = self._get_commit_diff_status(hash_id)
 
                 # Build result entry
                 branch_names = commit_to_branch.get(hash_id, [])
@@ -970,7 +979,7 @@ class MemovManager:
                     "timestamp": commit_info.get("timestamp"),
                     "author": commit_info.get("author"),
                 }
-                if include_diff:
+                if effective_diff_mode != "none":
                     entry["diff"] = diff_data
                 result.append(entry)
 
@@ -999,6 +1008,68 @@ class MemovManager:
                 return {"timestamp": parts[0], "author": parts[1]}
 
         return {"timestamp": None, "author": None}
+
+    def _get_commit_diff_status(self, commit_hash: str) -> dict[str, dict]:
+        """Get file status (added/modified/deleted) for a commit without full diff content.
+
+        This is much faster than _get_commit_diff_by_file as it only runs one git command.
+
+        Args:
+            commit_hash: The commit hash to get status for.
+
+        Returns:
+            Dictionary mapping file paths to status dict (without hunks).
+            Example: {"file.py": {"status": "modified", "hunks": []}}
+        """
+        from memov.core.git import subprocess_call
+
+        try:
+            # Get parent commit
+            parent_cmd = [
+                "git",
+                f"--git-dir={self.bare_repo_path}",
+                "rev-parse",
+                f"{commit_hash}^",
+            ]
+            success, output = subprocess_call(command=parent_cmd)
+
+            result: dict[str, dict] = {}
+
+            if success and output.stdout.strip():
+                # Has parent - get diff status
+                parent_hash = output.stdout.strip()
+                status_cmd = [
+                    "git",
+                    f"--git-dir={self.bare_repo_path}",
+                    "diff",
+                    "--name-status",
+                    parent_hash,
+                    commit_hash,
+                ]
+                success, status_output = subprocess_call(command=status_cmd)
+                if success and status_output.stdout:
+                    for line in status_output.stdout.strip().splitlines():
+                        if not line:
+                            continue
+                        parts = line.split("\t", 1)
+                        if len(parts) == 2:
+                            status_char, file_path = parts
+                            if status_char == "A":
+                                result[file_path] = {"status": "added", "hunks": []}
+                            elif status_char == "D":
+                                result[file_path] = {"status": "deleted", "hunks": []}
+                            else:  # M, R, C, etc.
+                                result[file_path] = {"status": "modified", "hunks": []}
+            else:
+                # No parent (first commit) - all files are added
+                file_rel_paths, _ = GitManager.get_files_by_commit(self.bare_repo_path, commit_hash)
+                for rel_path in file_rel_paths:
+                    result[rel_path] = {"status": "added", "hunks": []}
+
+            return result
+        except Exception as e:
+            LOGGER.error(f"Error getting diff status for commit {commit_hash}: {e}")
+            return {}
 
     def _get_commit_diff_by_file(self, commit_hash: str) -> dict[str, dict]:
         """Get structured diff content for a specific commit, grouped by file.
