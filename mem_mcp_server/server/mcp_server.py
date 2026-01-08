@@ -66,122 +66,23 @@ class MemMCPTools:
     def snap(
         user_prompt: str, original_response: str, agent_plan: list[str], files_changed: str = ""
     ) -> str:
-        """Record every user interaction - MUST be called at the end of EVERY response.
+        """Record user interaction - call at the end of **EVERY** response.
 
-        **CRITICAL: Call this tool for EVERY user interaction, no exceptions!**
-
-        This tool ensures complete interaction history by recording:
-        - User prompts (questions, requests, commands)
-        - Agent responses (answers, explanations, code changes)
-        - Files changed (if any)
-
-        **When to call (ALWAYS):**
-        - User asked a question → Call with files_changed=""
-        - User requested code changes → Call with files_changed="file1.py,file2.js"
-        - User just chatting → Call with files_changed=""
-        - Operation failed → Still call to record what happened
-        - Read-only operations (viewing, searching) → Call with files_changed=""
-
-        **When NOT to call:**
-        - After rename operations - `mem rename` already handles the recording
-        - After remove operations - `mem remove` already handles the recording
-
-        **Intelligent Workflow:**
-        1. **Auto-initialize** - Creates memov repository if it doesn't exist
-        2. **For interactions without file changes** - Records prompt and response only
-        3. **For interactions with file changes:**
-           - Status check - Analyzes current file states (untracked, modified, clean)
-           - New files → `mem track` (auto-commits with prompt)
-           - Modified files → `mem snap` (records changes with prompt)
+        **When to call:** ALWAYS, except after `mem_ui` or `mem_history`.
 
         Args:
             user_prompt: The user's exact original prompt/request
-            original_response: The exact original full response from the AI agent
-                Note:
-                    - Make sure to include the entire response, including any code blocks or explanations.
-
-                Example:
-                    Chat content:
-                        [User Prompt]: Change the print statement in hello.py to "Hello World"
-                        [AI Response]: I can see that the file currently shows "Hello Earth" but you mentioned the edits were undone. Let me check the current content of the file to see what needs to be changed. I can see the file currently has "Hello Earth". I'll change it back to "Hello World" as requested.
-                        ```
-                        Made changes.
-                        ```
-                        I've successfully changed "Hello Earth" back to "Hello World" in both the comment and the print statement in your hello.py file. The script will now output "Hello World" when run.
-                    original_response:
-                        I can see that the file currently shows "Hello Earth" but you mentioned the edits were undone. Let me check the current content of the file to see what needs to be changed. I can see the file currently has "Hello Earth". I'll change it back to "Hello World" as requested.
-                        ```
-                        Made changes.
-                        ```
-                        I've successfully changed "Hello Earth" back to "Hello World" in both the comment and the print statement in your hello.py file. The script will now output "Hello World" when run.
-            agent_plan: High-level summary of the major changes, organized by file
-                Notes:
-                    - Each step should describe ONE significant modification to a specific file
-                    - Format: "[file]: [what changed]"
-                    - Aim for 2-5 high-level steps that map to distinct logical changes
-                    - Focus on WHAT was changed in each file, not HOW the change was made
-                    - Group all related changes to the same file into one step when they serve the same purpose
-
-                Format:
-                    [
-                        "<filename>: <concise description of what changed>",
-                        "<filename>: <concise description of what changed>",
-                        ...
-                    ]
-
-                Good Examples (file-focused, concise):
-                    Example 1 - Multiple files changed:
-                        [User Prompt]: Add error handling and logging to the API endpoint
-                        agent_plan:
-                        [
-                            "api/routes.py: Added try-catch error handling and logging integration",
-                            "utils/logger.py: Created configure_logging() helper function"
-                        ]
-
-                    Example 2 - Multiple files for feature:
-                        [User Prompt]: Refactor database connection to use connection pooling
-                        agent_plan:
-                        [
-                            "db/connection.py: Refactored to use connection pool instead of direct connections",
-                            "db/pool.py: Implemented ConnectionPool class with acquire/release methods",
-                            "config/settings.py: Added connection pool configuration parameters"
-                        ]
-
-                    Example 3 - Simple single file change:
-                        [User Prompt]: Fix typo in error message
-                        agent_plan:
-                        [
-                            "handlers/auth.py: Fixed typo in error message"
-                        ]
-
-                    Example 4 - New files created:
-                        [User Prompt]: Create a user authentication module
-                        agent_plan:
-                        [
-                            "auth/login.py: Created login handler with JWT token generation",
-                            "auth/middleware.py: Created authentication middleware",
-                            "tests/test_auth.py: Added test cases for login and middleware"
-                        ]
-
-                Bad Examples (too vague, too granular, or missing file):
-                    ❌ "Updated the code" (no file specified)
-                    ❌ "api/routes.py: Made changes" (too vague, what changed?)
-                    ❌ "Added a line" (no file, no context)
-                    ❌ "Fixed the bug" (no file specified)
-                    ❌ "api/routes.py: Added import, created variable, wrote if statement, added return, saved file" (too granular - should be one logical change)
-                    ❌ "Added error handling in handle_request(), error_handler(), and validate_input() functions" (no file specified)
-
-                Key Principles:
-                    - Always start with the file path
-                    - Describe the logical change, not implementation details
-                    - One file, one logical purpose = one step
-                    - Be concise but specific about what changed
-
-            files_changed: Comma-separated relative path list of files that were modified/created/deleted
-                          (e.g. "file1.py,module1/file2.py"), or empty string "" if no files changed
+            original_response: Your complete response (include all text and code blocks)
+            agent_plan: List of changes by file, format: ["file.py: what changed", ...]
+                Examples:
+                    ["api/routes.py: Added error handling", "utils/logger.py: Created logger helper"]
+                    ["auth.py: Fixed typo in error message"]
+                    ["server.py: L12 added import, L45 added retry logic, L89 updated timeout config"]
+            files_changed: Comma-separated file paths that were modified/created/deleted
+                          (e.g. "file1.py,src/file2.py"), or "" if no files changed
 
         Returns:
-            Detailed result of the complete workflow execution
+            Result of the recording operation
         """
         try:
             LOGGER.info(
@@ -396,9 +297,7 @@ class MemMCPTools:
 
         **When to use:**
         - To understand what changes were made previously
-        - To find a specific commit to jump back to
         - To review the sequence of AI interactions
-        - Before using `mem jump` to restore a previous state
 
         Args:
             limit: Maximum number of commits to return (default: 20, max: 50)
@@ -537,13 +436,11 @@ class MemMCPTools:
         - Timeline view of all commits
         - Branch filtering and navigation
         - Visual diff viewer for each file
-        - Jump to any snapshot with one click
 
         **When to use:**
         - To get a visual overview of your AI coding history
         - When you need to explore commits interactively
         - To compare changes across multiple snapshots
-        - Before jumping to a previous state
 
         Args:
             port: Port number for the web server (default: auto-select starting from 38888)
@@ -588,102 +485,6 @@ class MemMCPTools:
 
         except Exception as e:
             error_msg = f"[ERROR] Error in mem_ui: {str(e)}"
-            LOGGER.error(error_msg, exc_info=True)
-            return error_msg
-
-    @staticmethod
-    @mcp.tool()
-    def mem_jump(commit_hash: str) -> str:
-        """Jump to a specific snapshot, restoring all tracked files and creating a new branch.
-
-        **Purpose:**
-        Time-travel to a previous state by restoring all tracked files to exactly
-        how they were at a specific commit. This is useful for:
-        - Undoing unwanted changes
-        - Reviewing or testing a previous version
-        - Starting fresh from a known good state
-
-        **What happens:**
-        - This will OVERWRITE current file contents with the snapshot version
-        - A new branch (e.g., "jump/1") is automatically created at this commit
-        - You can immediately start making changes and snapping on this branch
-        - Files that existed in the snapshot but were deleted will be restored
-        - Files that exist now but didn't exist in the snapshot will be removed
-
-        **Workflow:**
-        1. Use `mem_history()` to find the commit hash you want to jump to
-        2. Use `mem_jump(commit_hash)` to restore files and create a new branch
-        3. Continue working - you're now on a new branch ready for snaps
-
-        Args:
-            commit_hash: The commit hash to jump to (full or short form, e.g., "abc123")
-
-        Returns:
-            Success or error message with details about the jump
-        """
-        try:
-            LOGGER.info(f"mem_jump called with commit_hash={commit_hash}")
-
-            if not commit_hash or not commit_hash.strip():
-                return (
-                    "[ERROR] commit_hash is required. Use mem_history() to find available commits."
-                )
-
-            if MemMCPTools._project_path is None:
-                raise ValueError("Project path is not set.")
-
-            if not os.path.exists(MemMCPTools._project_path):
-                raise ValueError(f"Project path '{MemMCPTools._project_path}' does not exist.")
-
-            memov_manager = MemovManager(project_path=MemMCPTools._project_path)
-
-            if (check_status := memov_manager.check()) is not MemStatus.SUCCESS:
-                return f"[ERROR] Memov not initialized: {check_status}. Run 'mem init' first."
-
-            # Get commit info before jumping for better feedback
-            history = memov_manager.get_history(limit=50)
-            target_entry = None
-            target_hash = commit_hash.strip().lower()
-            for entry in history:
-                if (
-                    entry["commit_hash"].startswith(target_hash)
-                    or entry["short_hash"] == target_hash
-                ):
-                    target_entry = entry
-                    break
-
-            if not target_entry:
-                return f"[ERROR] Commit '{commit_hash}' not found. Use mem_history() to see available commits."
-
-            # Perform the jump (now returns tuple)
-            jump_status, new_branch = memov_manager.jump(commit_hash.strip())
-
-            if jump_status is not MemStatus.SUCCESS:
-                return f"[ERROR] Failed to jump to commit '{commit_hash}': {jump_status}"
-
-            # Build success message
-            lines = []
-            lines.append(f"[SUCCESS] Jumped to commit {target_entry['short_hash']}")
-            lines.append(f"Created branch: {new_branch}")
-            lines.append("")
-            lines.append(f"Commit: {target_entry['commit_hash']}")
-            lines.append(f"Operation: {target_entry['operation']}")
-            if target_entry["prompt"]:
-                prompt_preview = (
-                    target_entry["prompt"][:100] + "..."
-                    if len(target_entry["prompt"]) > 100
-                    else target_entry["prompt"]
-                )
-                lines.append(f"Prompt: {prompt_preview}")
-            if target_entry["files"]:
-                lines.append(f"Files restored: {len(target_entry['files'])}")
-            lines.append("")
-            lines.append(f"You are now on branch '{new_branch}' - ready to snap!")
-
-            return "\n".join(lines)
-
-        except Exception as e:
-            error_msg = f"[ERROR] Error in mem_jump: {str(e)}"
             LOGGER.error(error_msg, exc_info=True)
             return error_msg
 

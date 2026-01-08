@@ -129,7 +129,7 @@
 
         /* Inline Search Box - DeepWiki Style */
         .inline-search {
-            background: rgba(245, 245, 247, 0.85);
+            background: rgba(245, 245, 247, 0.95);
             backdrop-filter: blur(20px);
             -webkit-backdrop-filter: blur(20px);
             border: 1px solid rgba(0, 0, 0, 0.08);
@@ -140,7 +140,8 @@
             max-width: 420px;
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
             overflow: visible;
-            position: relative;
+            position: sticky;
+            top: 0;
             z-index: 100;
         }
 
@@ -858,6 +859,86 @@
             color: #333;
         }
 
+        /* Node Detail Modal */
+        .node-detail-modal .modal-content {
+            max-width: 600px;
+        }
+
+        .node-detail-body {
+            padding: 20px;
+        }
+
+        .node-detail-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .node-detail-hash {
+            font-family: 'SF Mono', Consolas, monospace;
+            font-size: 16px;
+            font-weight: 600;
+            color: #333;
+            background: #f0f0f0;
+            padding: 4px 8px;
+            border-radius: 4px;
+        }
+
+        .node-detail-operation {
+            font-size: 12px;
+            padding: 2px 8px;
+            border-radius: 12px;
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+
+        .node-detail-branch {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .node-detail-time {
+            font-size: 12px;
+            color: #999;
+            margin-left: auto;
+        }
+
+        .node-detail-section {
+            margin-bottom: 16px;
+        }
+
+        .node-detail-section h4 {
+            font-size: 12px;
+            font-weight: 600;
+            color: #666;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+
+        .node-detail-section p {
+            font-size: 14px;
+            color: #333;
+            line-height: 1.6;
+            margin: 0;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .node-detail-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 20px;
+            padding-top: 16px;
+            border-top: 1px solid #eee;
+        }
+
+        .node-detail-actions .btn {
+            flex: 1;
+        }
+
         .diff-content {
             padding: 16px;
             font-family: 'SF Mono', Consolas, monospace;
@@ -1387,6 +1468,17 @@
                 <button class="modal-close" onclick="closeDiffModal()">&times;</button>
             </div>
             <div class="diff-content" id="diff-content"></div>
+        </div>
+    </div>
+
+    <!-- Node Detail Modal -->
+    <div class="modal node-detail-modal" id="node-detail-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Commit Details</h3>
+                <button class="modal-close" onclick="closeNodeDetailModal()">&times;</button>
+            </div>
+            <div class="node-detail-body" id="node-detail-body"></div>
         </div>
     </div>
 
@@ -2009,21 +2101,48 @@
             const node = graphData.nodes.find(n => n.id === nodeId);
             if (!node) return;
 
-            // Show a simple popup with node details
-            const details = `
-Commit: ${node.short_hash}
-Branch: ${node.branch || 'unknown'}
-Operation: ${node.operation || 'snap'}
-Time: ${formatTime(node.timestamp)}
+            // Reuse renderNodeFiles for consistent file display
+            const files = node.files || [];
+            const filesHtml = files.length > 0
+                ? renderNodeFiles(node)
+                : '<span style="color: #999; font-size: 12px;">No files changed</span>';
 
-Prompt: ${node.prompt || 'No prompt'}
+            const prompt = node.prompt || 'No prompt recorded';
+            const promptPreview = prompt.length > 300 ? prompt.substring(0, 300) + '...' : prompt;
 
-Files: ${(node.files || []).join(', ') || 'None'}
-            `.trim();
+            const html = `
+                <div class="node-detail-header">
+                    <span class="node-detail-hash">${node.short_hash}</span>
+                    <span class="node-detail-operation">${node.operation || 'snap'}</span>
+                    ${node.branch ? `<span class="node-detail-branch">${node.branch}</span>` : ''}
+                    <span class="node-detail-time">${formatTime(node.timestamp)}</span>
+                </div>
+                <div class="node-detail-section">
+                    <h4>Prompt</h4>
+                    <p>${escapeHtml(promptPreview)}</p>
+                </div>
+                ${node.agent_plan ? `
+                <div class="node-detail-section">
+                    <h4>Agent Plan</h4>
+                    <p>${escapeHtml(node.agent_plan.length > 200 ? node.agent_plan.substring(0, 200) + '...' : node.agent_plan)}</p>
+                </div>
+                ` : ''}
+                <div class="node-detail-section">
+                    <h4>Files${files.length > 0 ? ` (${files.length})` : ''}</h4>
+                    <div class="node-files">${filesHtml}</div>
+                </div>
+                <div class="node-detail-actions">
+                    <button class="btn" onclick="viewDiff('${node.id}'); closeNodeDetailModal();">View Diff</button>
+                    <button class="btn btn-secondary" onclick="jumpTo('${node.id}'); closeNodeDetailModal();">Jump Here</button>
+                </div>
+            `;
 
-            if (confirm(details + '\n\nJump to this commit?')) {
-                jumpTo(nodeId);
-            }
+            document.getElementById('node-detail-body').innerHTML = html;
+            document.getElementById('node-detail-modal').classList.add('show');
+        }
+
+        function closeNodeDetailModal() {
+            document.getElementById('node-detail-modal').classList.remove('show');
         }
 
         function formatTime(timestamp) {
@@ -2229,6 +2348,13 @@ Files: ${(node.files || []).join(', ') || 'None'}
         document.getElementById('search-modal').addEventListener('click', (e) => {
             if (e.target === document.getElementById('search-modal')) {
                 closeSearchModal();
+            }
+        });
+
+        // Node detail modal on background click
+        document.getElementById('node-detail-modal').addEventListener('click', (e) => {
+            if (e.target === document.getElementById('node-detail-modal')) {
+                closeNodeDetailModal();
             }
         });
 
