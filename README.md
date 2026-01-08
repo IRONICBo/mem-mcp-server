@@ -8,7 +8,7 @@
   <b>English</b> | <a href="docs/readme/README_DE.md">Deutsch</a> | <a href="docs/readme/README_ES.md">Español</a> | <a href="docs/readme/README_FR.md">Français</a> | <a href="docs/readme/README_JA.md">日本語</a> | <a href="docs/readme/README_KO.md">한국어</a> | <a href="docs/readme/README_PT.md">Português</a> | <a href="docs/readme/README_RU.md">Русский</a> | <a href="docs/readme/README_CN.md">中文</a>
 </p>
 
-<h4 align="center">VibeGit🤌: Auto-track your prompts, context & code diffs.</h4>
+<h4 align="center">VibeGit🤌: Auto-trace your prompts, context & code diffs.</h4>
 
 <div align="center">
 
@@ -48,9 +48,9 @@ MemoV is a memory layer for AI coding agents that provides **traceable**, **Git-
 ## Features
 
 - **One-click MCP**: Works with any AI coding agent
-- **VibeGit for Agents**: Auto-tracks prompts, context, and code diffs without manual commits
+- **VibeGit for Agents**: Auto-trace prompts, context, and code diffs before git commits
 - **Version Control**: Branch, rollback, replay any interaction
-- **Keep Git Clean**: Shadow `.mem` timeline, zero pollution on `.git` 
+- **Keep Git Clean**: Shadow `.mem` timeline, files as context, zero pollution on `.git` 
 - **Visual UI**: Say "mem ui" in chat, and view at http://localhost:38888
 - **Private-first** — Local, no database, no overhead. Use .memignore to exclude
 

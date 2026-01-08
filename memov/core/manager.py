@@ -179,17 +179,17 @@ class MemovManager:
                     response="Created default .memignore file",
                 )
 
-            # Auto-track all project files (excluding .memignore patterns)
+            # Auto-trace all project files (excluding .memignore patterns)
             # This ensures the initial project state is recorded before AI starts working
             track_result = self.track(
                 [self.project_path],
                 prompt="Initial project state",
-                response="Auto-tracked all project files on init",
+                response="Auto-traced all project files on init",
             )
             if track_result == MemStatus.SUCCESS:
-                LOGGER.info("Auto-tracked all project files on init")
+                LOGGER.info("Auto-traced all project files on init")
             else:
-                LOGGER.warning(f"Failed to auto-track project files: {track_result}")
+                LOGGER.warning(f"Failed to auto-trace project files: {track_result}")
 
             return MemStatus.SUCCESS
         except Exception as e:
@@ -521,7 +521,9 @@ class MemovManager:
 
                 LOGGER.debug(f"snapshot: commit_file_paths has {len(commit_file_paths)} entries")
                 for i, (rel, abs_p) in enumerate(list(commit_file_paths.items())[:3]):
-                    LOGGER.debug(f"snapshot: commit_file_paths[{i}]: rel={repr(rel)}, abs={repr(abs_p)}")
+                    LOGGER.debug(
+                        f"snapshot: commit_file_paths[{i}]: rel={repr(rel)}, abs={repr(abs_p)}"
+                    )
 
                 commit_msg = "Create snapshot\n\n"
                 commit_msg += f"Prompt: {prompt}\nResponse: {response}\nAgent Plan: {agent_plan}\nSource: {'User' if by_user else 'AI'}"
@@ -1552,9 +1554,7 @@ class MemovManager:
             if os.path.isdir(abs_path):
                 for root, dirs, files in os.walk(abs_path):
                     # Normalize path separator for cross-platform compatibility
-                    rel_root = normalize_path_separator(
-                        os.path.relpath(root, self.project_path)
-                    )
+                    rel_root = normalize_path_separator(os.path.relpath(root, self.project_path))
 
                     # Don't filter the current directory itself
                     if (
@@ -1582,9 +1582,7 @@ class MemovManager:
             # If the file is a regular file, check if it should be tracked
             elif os.path.isfile(abs_path):
                 # Normalize path separator for cross-platform compatibility
-                rel_file = normalize_path_separator(
-                    os.path.relpath(abs_path, self.project_path)
-                )
+                rel_file = normalize_path_separator(os.path.relpath(abs_path, self.project_path))
                 if filter(rel_file):
                     continue
 
