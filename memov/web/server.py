@@ -123,7 +123,7 @@ def create_app(project_path: str) -> "FastAPI":
             # Return empty graph instead of error - let frontend show "not initialized" UI
             return {"nodes": [], "edges": [], "jump_edges": [], "current_branch": None}
 
-        history = manager.get_history(limit=100)
+        history = manager.get_history(limit=10000, diff_mode="status")
         branches = manager._load_branches()
 
         # Build graph structure
@@ -277,7 +277,9 @@ Question: {request.query}"""
 
             return {"response": response}
         except httpx.HTTPStatusError as e:
-            raise HTTPException(status_code=e.response.status_code, detail=f"API error: {e.response.text}")
+            raise HTTPException(
+                status_code=e.response.status_code, detail=f"API error: {e.response.text}"
+            )
         except Exception as e:
             LOGGER.error(f"AI search error: {e}")
             raise HTTPException(status_code=500, detail=str(e))
