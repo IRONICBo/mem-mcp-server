@@ -578,3 +578,266 @@ class GitManager:
             LOGGER.error(
                 f"Failed to set git user.email to '{default_email}' in repository at {repo_path}"
             )
+
+    @staticmethod
+    def get_commits_info_batch(
+        repo_path: str, commit_hashes: list[str]
+    ) -> dict[str, dict]:
+        """Get commit info (message, timestamp, author) for multiple commits in one call.
+
+        This is much faster than calling get_commit_message/get_commit_info for each commit.
+
+        Args:
+            repo_path: Path to the Git repository.
+            commit_hashes: List of commit hashes to get info for.
+
+        Returns:
+            Dictionary mapping commit hash to info dict with keys:
+                - message: Full commit message
+                - timestamp: ISO format timestamp
+                - author: Author name
+        """
+        if not commit_hashes:
+            return {}
+
+        # Use a unique delimiter that won't appear in commit messages
+        record_sep = "<<<RECORD_SEP>>>"
+        field_sep = "<<<FIELD_SEP>>>"
+
+        # Format: hash, author date (ISO), author name, full message
+        format_str = f"%H{field_sep}%aI{field_sep}%an{field_sep}%B{record_sep}"
+
+        command = [
+            "git",
+            f"--git-dir={repo_path}",
+            "log",
+            f"--format={format_str}",
+            "--no-walk",
+            "--stdin",
+        ]
+
+        # Pass commit hashes via stdin
+        input_data = "\n".join(commit_hashes)
+        success, output = subprocess_call(command=command, input=input_data)
+
+        result = {}
+        if success and output.stdout:
+            records = output.stdout.split(record_sep)
+            for record in records:
+                record = record.strip()
+                if not record:
+                    continue
+                parts = record.split(field_sep)
+                if len(parts) >= 4:
+                    commit_hash = parts[0]
+                    result[commit_hash] = {
+                        "message": parts[3].strip(),
+                        "timestamp": parts[1],
+                        "author": parts[2],
+                    }
+
+        return result
+
+    @staticmethod
+    def get_all_notes_batch(repo_path: str) -> dict[str, str]:
+        """Get all git notes in one call.
+
+        Args:
+            repo_path: Path to the Git repository.
+
+        Returns:
+            Dictionary mapping commit hash to note content.
+        """
+        # List all notes with their content
+        command = [
+            "git",
+            f"--git-dir={repo_path}",
+            "notes",
+            "list",
+        ]
+        success, output = subprocess_call(command=command)
+
+        if not success or not output.stdout:
+            return {}
+
+        # notes list returns: blob_hash commit_hash
+        note_refs = {}
+        for line in output.stdout.strip().splitlines():
+            parts = line.split()
+            if len(parts) >= 2:
+                blob_hash, commit_hash = parts[0], parts[1]
+                note_refs[commit_hash] = blob_hash
+
+        if not note_refs:
+            return {}
+
+        # Batch fetch all note contents using cat-file --batch
+        result = {}
+        blob_to_commit = {v: k for k, v in note_refs.items()}
+
+        # Use cat-file --batch to get all blobs at once
+        command = [
+            "git",
+            f"--git-dir={repo_path}",
+            "cat-file",
+            "--batch",
+        ]
+        input_data = "\n".join(note_refs.values())
+        success, output = subprocess_call(command=command, input=input_data)
+
+        if success and output.stdout:
+            # Parse batch output: each blob has header line followed by content
+            lines = output.stdout.split("\n")
+            i = 0
+            while i < len(lines):
+                header = lines[i]
+                if " blob " in header:
+                    parts = header.split()
+                    blob_hash = parts[0]
+                    size = int(parts[2])
+                    # Collect content lines until we have enough bytes
+                    content_lines = []
+                    content_len = 0
+                    i += 1
+                    while i < len(lines) and content_len < size:
+                        line = lines[i]
+                        content_lines.append(line)
+                        content_len += len(line) + 1  # +1 for newline
+                        i += 1
+                    content = "\n".join(content_lines).strip()
+                    if blob_hash in blob_to_commit:
+                        result[blob_to_commit[blob_hash]] = content
+                else:
+                    i += 1
+
+        return result
+
+    @staticmethod
+    def get_diff_status_batch(
+        repo_path: str, commit_hashes: list[str]
+    ) -> dict[str, dict[str, dict]]:
+        """Get file status (added/modified/deleted) for multiple commits.
+
+        This uses git log with --name-status to get status for all commits at once.
+
+        Args:
+            repo_path: Path to the Git repository.
+            commit_hashes: List of commit hashes.
+
+        Returns:
+            Dictionary mapping commit hash to file status dict.
+            Example: {"abc123": {"file.py": {"status": "modified", "hunks": []}}}
+        """
+        if not commit_hashes:
+            return {}
+
+        record_sep = "<<<RECORD_SEP>>>"
+
+        # Get commit hash and name-status in one call
+        command = [
+            "git",
+            f"--git-dir={repo_path}",
+            "log",
+            f"--format=%H{record_sep}",
+            "--name-status",
+            "--no-walk",
+            "--stdin",
+        ]
+
+        input_data = "\n".join(commit_hashes)
+        success, output = subprocess_call(command=command, input=input_data)
+
+        result = {}
+        if success and output.stdout:
+            # Split by record separator, then parse each record
+            parts = output.stdout.split(record_sep)
+            for i in range(0, len(parts) - 1, 1):
+                section = parts[i].strip()
+                if not section:
+                    continue
+
+                lines = section.split("\n")
+                if not lines:
+                    continue
+
+                commit_hash = lines[0].strip()
+                if not commit_hash:
+                    continue
+
+                # Parse file status from remaining lines
+                files_status = {}
+                for line in lines[1:]:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    file_parts = line.split("\t", 1)
+                    if len(file_parts) >= 2:
+                        status_char, file_path = file_parts[0], file_parts[1]
+                        if status_char.startswith("A"):
+                            files_status[file_path] = {"status": "added", "hunks": []}
+                        elif status_char.startswith("D"):
+                            files_status[file_path] = {"status": "deleted", "hunks": []}
+                        else:
+                            files_status[file_path] = {"status": "modified", "hunks": []}
+
+                result[commit_hash] = files_status
+
+        return result
+
+    @staticmethod
+    def get_files_by_commits_batch(
+        repo_path: str, commit_hashes: list[str]
+    ) -> dict[str, list[str]]:
+        """Get the list of files for multiple commits in one call.
+
+        Args:
+            repo_path: Path to the Git repository.
+            commit_hashes: List of commit hashes.
+
+        Returns:
+            Dictionary mapping commit hash to list of file paths.
+        """
+        if not commit_hashes:
+            return {}
+
+        record_sep = "<<<RECORD_SEP>>>"
+
+        # Use git log with --name-only to get files for each commit
+        command = [
+            "git",
+            f"--git-dir={repo_path}",
+            "log",
+            f"--format=%H{record_sep}",
+            "--name-only",
+            "--no-walk",
+            "--stdin",
+        ]
+
+        input_data = "\n".join(commit_hashes)
+        success, output = subprocess_call(command=command, input=input_data)
+
+        result = {}
+        if success and output.stdout:
+            parts = output.stdout.split(record_sep)
+            for section in parts:
+                section = section.strip()
+                if not section:
+                    continue
+
+                lines = section.split("\n")
+                if not lines:
+                    continue
+
+                commit_hash = lines[0].strip()
+                if not commit_hash:
+                    continue
+
+                # Remaining lines are file paths
+                files = [
+                    clean_windows_git_lstree_output(f.strip())
+                    for f in lines[1:]
+                    if f.strip()
+                ]
+                result[commit_hash] = files
+
+        return result
