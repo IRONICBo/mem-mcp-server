@@ -111,7 +111,7 @@ class GitManager:
             LOGGER.debug(f"get_files_by_commit raw stdout (repr): {repr(raw_stdout[:500])}")
 
             # Clean the entire output first to remove any stray control characters
-            cleaned_stdout = raw_stdout.replace('\r', '').strip()
+            cleaned_stdout = raw_stdout.replace("\r", "").strip()
             LOGGER.debug(f"get_files_by_commit cleaned stdout (repr): {repr(cleaned_stdout[:500])}")
 
             for rel_file in cleaned_stdout.splitlines():
@@ -123,7 +123,9 @@ class GitManager:
                 abs_file_path = str((project_root / rel_file).resolve())
 
                 if len(file_rel_paths) < 3:
-                    LOGGER.debug(f"get_files_by_commit: rel_file={repr(rel_file)}, abs_file_path={repr(abs_file_path)}")
+                    LOGGER.debug(
+                        f"get_files_by_commit: rel_file={repr(rel_file)}, abs_file_path={repr(abs_file_path)}"
+                    )
 
                 file_rel_paths.append(rel_file)
                 file_abs_paths.append(abs_file_path)
@@ -152,7 +154,7 @@ class GitManager:
         if success and output.stdout:
             file_blobs = {}
             # Clean the entire output first to remove any stray control characters
-            cleaned_stdout = output.stdout.replace('\r', '').strip()
+            cleaned_stdout = output.stdout.replace("\r", "").strip()
             for line in cleaned_stdout.splitlines():
                 # git ls-tree format: "<mode> <type> <hash>\t<filename>"
                 # Split by tab first to handle filenames with spaces
@@ -224,11 +226,11 @@ class GitManager:
         LOGGER.debug(f"write_blobs input_paths (repr, first 500): {repr(input_paths[:500])}")
 
         # Use binary mode to prevent Windows from converting \n to \r\n
-        input_data = input_paths.encode('utf-8')
+        input_data = input_paths.encode("utf-8")
         success, output = subprocess_call(command=command, input=input_data, text=False)
 
         if success and output.stdout:
-            hashes = output.stdout.decode('utf-8').strip().splitlines()
+            hashes = output.stdout.decode("utf-8").strip().splitlines()
             if len(hashes) == len(file_paths):
                 return dict(zip(file_paths, hashes))
             else:
@@ -257,11 +259,11 @@ class GitManager:
         """Create a tree object in the Git repository."""
         command = ["git", f"--git-dir={repo_path}", "mktree"]
         # Use binary mode to prevent Windows from converting \n to \r\n
-        input_data = "".join(entries).encode('utf-8')
+        input_data = "".join(entries).encode("utf-8")
         success, output = subprocess_call(command=command, input=input_data, text=False)
 
         if success and output.stdout:
-            return output.stdout.decode('utf-8').strip()
+            return output.stdout.decode("utf-8").strip()
         else:
             LOGGER.error(f"Failed to create tree in repository at {repo_path}")
             return ""
@@ -275,11 +277,11 @@ class GitManager:
             command.extend(["-p", parent_hash])
 
         # Use binary mode to prevent Windows from converting \n to \r\n
-        input_data = commit_msg.encode('utf-8')
+        input_data = commit_msg.encode("utf-8")
         success, output = subprocess_call(command=command, input=input_data, text=False)
 
         if success and output.stdout:
-            return output.stdout.decode('utf-8').strip()
+            return output.stdout.decode("utf-8").strip()
         else:
             LOGGER.error(f"Failed to commit tree in repository at {repo_path}")
             return ""
@@ -297,7 +299,9 @@ class GitManager:
 
         LOGGER.debug(f"write_blob_to_bare_repo called with {len(new_file_paths)} files")
         for i, (rel, abs_p) in enumerate(list(new_file_paths.items())[:3]):
-            LOGGER.debug(f"write_blob_to_bare_repo new_file_paths[{i}]: rel={repr(rel)}, abs={repr(abs_p)}")
+            LOGGER.debug(
+                f"write_blob_to_bare_repo new_file_paths[{i}]: rel={repr(rel)}, abs={repr(abs_p)}"
+            )
 
         # Batch write all blobs in a single git call for better performance
         abs_paths = list(new_file_paths.values())
@@ -473,11 +477,11 @@ class GitManager:
         else:
             # Get detailed error message from git
             stderr_msg = ""
-            if output is not None and hasattr(output, 'stderr'):
+            if output is not None and hasattr(output, "stderr"):
                 stderr = output.stderr
                 # Handle both bytes and string stderr
                 if isinstance(stderr, bytes):
-                    stderr_msg = stderr.decode('utf-8', errors='replace')
+                    stderr_msg = stderr.decode("utf-8", errors="replace")
                 else:
                     stderr_msg = str(stderr)
             LOGGER.error(
@@ -508,14 +512,14 @@ class GitManager:
         # Use git notes with -F - to read message from stdin (supports multiline)
         command = ["git", f"--git-dir={repo_path}", "notes", "add", "-f", "-F", "-", commit_hash]
         # Use binary mode to prevent Windows from converting \n to \r\n
-        input_data = new_message.encode('utf-8')
+        input_data = new_message.encode("utf-8")
         success, output = subprocess_call(command=command, input=input_data, text=False)
         if not success:
             error_msg = ""
-            if output is not None and hasattr(output, 'stderr'):
+            if output is not None and hasattr(output, "stderr"):
                 stderr = output.stderr
                 if isinstance(stderr, bytes):
-                    error_msg = stderr.decode('utf-8', errors='replace')
+                    error_msg = stderr.decode("utf-8", errors="replace")
                 else:
                     error_msg = str(stderr) if stderr else "Unknown error"
             LOGGER.error(f"Failed to add git note for {commit_hash}: {error_msg}")
@@ -580,9 +584,7 @@ class GitManager:
             )
 
     @staticmethod
-    def get_commits_info_batch(
-        repo_path: str, commit_hashes: list[str]
-    ) -> dict[str, dict]:
+    def get_commits_info_batch(repo_path: str, commit_hashes: list[str]) -> dict[str, dict]:
         """Get commit info (message, timestamp, author) for multiple commits in one call.
 
         This is much faster than calling get_commit_message/get_commit_info for each commit.
@@ -738,7 +740,7 @@ class GitManager:
             "git",
             f"--git-dir={repo_path}",
             "log",
-            f"--format=%H{record_sep}",
+            f"--format={record_sep}%H",
             "--name-status",
             "--no-walk",
             "--stdin",
@@ -751,8 +753,8 @@ class GitManager:
         if success and output.stdout:
             # Split by record separator, then parse each record
             parts = output.stdout.split(record_sep)
-            for i in range(0, len(parts) - 1, 1):
-                section = parts[i].strip()
+            for section in parts:
+                section = section.strip()
                 if not section:
                     continue
 
@@ -788,7 +790,7 @@ class GitManager:
     def get_files_by_commits_batch(
         repo_path: str, commit_hashes: list[str]
     ) -> dict[str, list[str]]:
-        """Get the list of files for multiple commits in one call.
+        """Get the list of files for multiple commits.
 
         Args:
             repo_path: Path to the Git repository.
@@ -800,44 +802,24 @@ class GitManager:
         if not commit_hashes:
             return {}
 
-        record_sep = "<<<RECORD_SEP>>>"
-
-        # Use git log with --name-only to get files for each commit
-        command = [
-            "git",
-            f"--git-dir={repo_path}",
-            "log",
-            f"--format=%H{record_sep}",
-            "--name-only",
-            "--no-walk",
-            "--stdin",
-        ]
-
-        input_data = "\n".join(commit_hashes)
-        success, output = subprocess_call(command=command, input=input_data)
-
         result = {}
-        if success and output.stdout:
-            parts = output.stdout.split(record_sep)
-            for section in parts:
-                section = section.strip()
-                if not section:
-                    continue
-
-                lines = section.split("\n")
-                if not lines:
-                    continue
-
-                commit_hash = lines[0].strip()
-                if not commit_hash:
-                    continue
-
-                # Remaining lines are file paths
+        for commit_hash in commit_hashes:
+            command = [
+                "git",
+                f"--git-dir={repo_path}",
+                "ls-tree",
+                "-r",
+                "--name-only",
+                commit_hash,
+            ]
+            success, output = subprocess_call(command=command)
+            if success and output.stdout:
+                cleaned_stdout = output.stdout.replace("\r", "").strip()
                 files = [
-                    clean_windows_git_lstree_output(f.strip())
-                    for f in lines[1:]
-                    if f.strip()
+                    clean_windows_git_lstree_output(f) for f in cleaned_stdout.splitlines() if f
                 ]
-                result[commit_hash] = files
+            else:
+                files = []
+            result[commit_hash] = files
 
         return result
