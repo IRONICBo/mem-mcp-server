@@ -259,23 +259,60 @@ def create_app(project_path: str) -> "FastAPI":
         # Build AI prompt
         system_prompt = """You are an AI assistant helping users search their code history.
 You will be given a list of commits with their prompts/messages.
-Answer the user's question based on this history. Be concise."""
+Answer the user's question based on this history. Be concise.
+
+IMPORTANT: Your response must be in JSON format with two fields:
+1. "answer": A concise answer to the user's question
+2. "commit_ids": An array of relevant commit hashes (short 7-char format) mentioned in your answer
+
+Example format:
+{
+  "answer": "You fixed the login bug in commit abc1234...",
+  "commit_ids": ["abc1234", "def5678"]
+}"""
 
         user_prompt = f"""Commit history (format: [hash] branch | prompt):
 
 {history_context}
 
-Question: {request.query}"""
+Question: {request.query}
+
+Remember to respond in JSON format with "answer" and "commit_ids" fields."""
 
         try:
             if request.provider == "anthropic":
-                response = await _call_anthropic(request.api_key, system_prompt, user_prompt)
+                ai_response = await _call_anthropic(request.api_key, system_prompt, user_prompt)
             elif request.provider == "openai":
-                response = await _call_openai(request.api_key, system_prompt, user_prompt)
+                ai_response = await _call_openai(request.api_key, system_prompt, user_prompt)
             else:
                 raise HTTPException(status_code=400, detail=f"Unknown provider: {request.provider}")
 
-            return {"response": response}
+            # Parse JSON response
+            import json
+            try:
+                parsed = json.loads(ai_response)
+                answer = parsed.get("answer", ai_response)
+                commit_ids = parsed.get("commit_ids", [])
+            except json.JSONDecodeError:
+                # Fallback if AI doesn't return JSON
+                answer = ai_response
+                commit_ids = []
+                # Try to extract commit hashes from the response
+                import re
+                commit_ids = re.findall(r'\b[a-f0-9]{7}\b', ai_response.lower())
+
+            # Convert short hashes to full commit hashes
+            full_commit_ids = []
+            for short_hash in commit_ids:
+                for entry in history:
+                    if entry["short_hash"].lower().startswith(short_hash.lower()):
+                        full_commit_ids.append(entry["commit_hash"])
+                        break
+
+            return {
+                "response": answer,
+                "commit_ids": full_commit_ids
+            }
         except httpx.HTTPStatusError as e:
             raise HTTPException(
                 status_code=e.response.status_code, detail=f"API error: {e.response.text}"

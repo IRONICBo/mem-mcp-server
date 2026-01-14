@@ -2668,7 +2668,7 @@
             return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         }
 
-        function jumpToSearchResult(nodeId) {
+        function jumpToSearchResult(nodeId, stayInAllView = false) {
             closeSearchModal();
 
             // Clear previous selected node highlight
@@ -2676,8 +2676,8 @@
                 el.classList.remove('selected-node');
             });
 
-            // If in tree view, switch to branch view first
-            if (viewMode === 'all') {
+            // If in tree view, switch to branch view first (unless stayInAllView is true)
+            if (viewMode === 'all' && !stayInAllView) {
                 const branch = nodeBranch[nodeId];
                 if (branch) {
                     showBranchView(branch);
@@ -2731,10 +2731,50 @@
                     throw new Error(data.detail || 'Search failed');
                 }
 
-                resultsDiv.innerHTML = `
-                    <div class="ai-response-header">AI Response (${provider})</div>
+                // Highlight relevant commits in the graph/timeline
+                const commitIds = data.commit_ids || [];
+                if (commitIds.length > 0) {
+                    highlightSearchResults(commitIds);
+                }
+
+                // Build results HTML with AI response
+                const providerName = provider === 'anthropic' ? 'Claude' : 'OpenAI';
+                let resultsHtml = `
+                    <div class="ai-response-header">AI Response (${providerName})</div>
                     <div class="ai-response">${escapeHtml(data.response)}</div>
                 `;
+
+                // Add commit list if there are relevant commits
+                if (commitIds.length > 0 && graphData && graphData.nodes) {
+                    // Get commit details
+                    const matchedNodes = commitIds.map(id => {
+                        return graphData.nodes.find(node => node.id === id);
+                    }).filter(node => node !== undefined);
+
+                    if (matchedNodes.length > 0) {
+                        const itemsHtml = matchedNodes.map(node => {
+                            return `
+                                <div class="search-result-item" onclick="jumpToSearchResult('${node.id}', true)">
+                                    <div class="search-result-header">
+                                        <span class="search-result-hash">${node.short_hash}</span>
+                                        ${node.branch ? `<span class="search-result-branch">${escapeHtml(node.branch)}</span>` : ''}
+                                        <span class="search-result-time">${formatTime(node.timestamp)}</span>
+                                    </div>
+                                    <div class="search-result-prompt">${escapeHtml((node.prompt || 'No prompt').substring(0, 100))}${(node.prompt || '').length > 100 ? '...' : ''}</div>
+                                </div>
+                            `;
+                        }).join('');
+
+                        resultsHtml += `
+                            <div style="margin-top: 16px; padding-top: 12px; border-top: 1px solid #444;">
+                                <div style="font-size: 12px; color: #666; margin-bottom: 12px;">${matchedNodes.length} relevant commit(s)</div>
+                                ${itemsHtml}
+                            </div>
+                        `;
+                    }
+                }
+
+                resultsDiv.innerHTML = resultsHtml;
             } catch (e) {
                 resultsDiv.innerHTML = `<div class="search-error">Error: ${escapeHtml(e.message)}</div>`;
             }
@@ -3015,15 +3055,56 @@
                     throw new Error(data.detail || 'Search failed');
                 }
 
-                // Show AI response in results area
+                // Highlight relevant commits
+                const commitIds = data.commit_ids || [];
+                if (commitIds.length > 0) {
+                    highlightSearchResults(commitIds);
+                }
+
+                // Get commit details for the results list
+                const matchedNodes = commitIds.map(id => {
+                    return graphData.nodes.find(node => node.id === id);
+                }).filter(node => node !== undefined);
+
+                // Build results HTML
                 const providerName = provider === 'anthropic' ? 'Claude' : 'OpenAI';
-                showSearchResults(`
+                let resultsHtml = `
                     <div class="ai-header">
                         <span>AI Response (${providerName})</span>
                         <button class="close-btn" onclick="hideSearchResults()" title="Close">&times;</button>
                     </div>
                     <div class="ai-response">${escapeHtml(data.response)}</div>
-                `);
+                `;
+
+                // Add commit list if there are matches
+                if (matchedNodes.length > 0) {
+                    const itemsHtml = matchedNodes.map(node => {
+                        const changedFiles = node.files && node.diff
+                            ? node.files.filter(f => node.diff[f] && node.diff[f].status !== 'unchanged').slice(0, 4)
+                            : [];
+
+                        return `
+                            <div class="search-result-item" onclick="scrollToNode('${node.id}')">
+                                <div class="search-result-header">
+                                    <span class="search-result-hash">${node.short_hash}</span>
+                                    ${node.branch ? `<span class="search-result-branch">${escapeHtml(node.branch)}</span>` : ''}
+                                    <span class="search-result-time">${formatTime(node.timestamp)}</span>
+                                </div>
+                                <div class="search-result-prompt">${escapeHtml((node.prompt || 'No prompt').substring(0, 100))}${(node.prompt || '').length > 100 ? '...' : ''}</div>
+                                ${changedFiles.length > 0 ? `<div class="search-result-files">${changedFiles.map(f => escapeHtml(f)).join(', ')}${node.files.length > 4 ? ` (+${node.files.length - 4} more)` : ''}</div>` : ''}
+                            </div>
+                        `;
+                    }).join('');
+
+                    resultsHtml += `
+                        <div style="margin-top: 16px; padding-top: 12px; border-top: 1px solid #333;">
+                            <div style="font-size: 12px; color: #666; margin-bottom: 12px;">${matchedNodes.length} relevant commit(s)</div>
+                            ${itemsHtml}
+                        </div>
+                    `;
+                }
+
+                showSearchResults(resultsHtml);
             } catch (e) {
                 showSearchResults(`
                     <div class="ai-header">
