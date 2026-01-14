@@ -928,9 +928,25 @@ class MemovManager:
             # Process commits (most recent first, limited)
             all_commits = all_commits[-limit:] if len(all_commits) > limit else all_commits
 
+            # Batch fetch all commit info in one call (message, timestamp, author)
+            commits_info = GitManager.get_commits_info_batch(self.bare_repo_path, all_commits)
+
+            # Batch fetch all notes in one call
+            all_notes = GitManager.get_all_notes_batch(self.bare_repo_path)
+
+            # Batch fetch files for all commits
+            all_files = GitManager.get_files_by_commits_batch(self.bare_repo_path, all_commits)
+
+            # Batch fetch diff status if needed
+            effective_diff_mode = diff_mode if include_diff else "none"
+            all_diff_status = {}
+            if effective_diff_mode == "status":
+                all_diff_status = GitManager.get_diff_status_batch(self.bare_repo_path, all_commits)
+
             for hash_id in all_commits:
-                # Get the commit message
-                message = GitManager.get_commit_message(self.bare_repo_path, hash_id)
+                # Get commit info from batch result
+                info = commits_info.get(hash_id, {})
+                message = info.get("message", "")
                 operation_type = self._extract_operation_type(message)
 
                 # Parse prompt, response, agent_plan from commit message (multi-line aware)
@@ -940,7 +956,7 @@ class MemovManager:
                 agent_plan = parsed["agent_plan"]
 
                 # Check if there's a git note for this commit (priority over commit message)
-                note_content = GitManager.get_commit_note(self.bare_repo_path, hash_id)
+                note_content = all_notes.get(hash_id, "")
                 if note_content:
                     note_parsed = self._parse_note_content(note_content)
                     if note_parsed["prompt"]:
@@ -950,19 +966,16 @@ class MemovManager:
                     if note_parsed["agent_plan"]:
                         agent_plan = note_parsed["agent_plan"]
 
-                # Get files in this commit
-                file_rel_paths, _ = GitManager.get_files_by_commit(self.bare_repo_path, hash_id)
-
-                # Get commit details (timestamp, author) using git log
-                commit_info = self._get_commit_info(hash_id)
+                # Get files from batch result
+                file_rel_paths = all_files.get(hash_id, [])
 
                 # Get diff information based on diff_mode
                 diff_data = {}
-                effective_diff_mode = diff_mode if include_diff else "none"
                 if effective_diff_mode == "full":
+                    # Full diff still needs per-commit call (complex parsing)
                     diff_data = self._get_commit_diff_by_file(hash_id)
                 elif effective_diff_mode == "status":
-                    diff_data = self._get_commit_diff_status(hash_id)
+                    diff_data = all_diff_status.get(hash_id, {})
 
                 # Build result entry
                 branch_names = commit_to_branch.get(hash_id, [])
@@ -976,8 +989,8 @@ class MemovManager:
                     "response": response if response and response != "None" else None,
                     "agent_plan": agent_plan if agent_plan and agent_plan != "None" else None,
                     "files": file_rel_paths,
-                    "timestamp": commit_info.get("timestamp"),
-                    "author": commit_info.get("author"),
+                    "timestamp": info.get("timestamp"),
+                    "author": info.get("author"),
                 }
                 if effective_diff_mode != "none":
                     entry["diff"] = diff_data
