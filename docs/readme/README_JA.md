@@ -32,6 +32,7 @@ MemoVは、AIコーディングエージェントのためのメモリレイヤ�
 
 </div>
 
+![MemoV Time](../images/ALL.png)
 - 💬 [Discordに参加](https://discord.gg/un54aD7Hug)して、スマートなバイブエンジニアリングを探求しよう
 
 ## 機能
@@ -43,6 +44,8 @@ MemoVは、AIコーディングエージェントのためのメモリレイヤ�
 - **ビジュアルUI** — チャットで「mem ui」と言うだけ、http://localhost:38888 で表示
 - **プライバシーファースト** — ローカル、データベース不要、オーバーヘッドなし。.memignoreで除外
 
+
+![MemoV Time](../images/one.png)
 ## クイックスタート（MCPインストール）
 
 ### 前提条件
@@ -124,6 +127,35 @@ codex mcp add mem-mcp -- uvx --from git+https://github.com/memovai/memov.git mem
 ```
 
 </details>
+
+<details>
+<summary><b>Antigravity</b></summary>
+
+> **注意:** Antigravity は "${workspaceFolder}" 変数をサポートしていません。プロジェクトディレクトリの絶対パスを手動で入力してください。
+
+**Settings > MCP** に移動して、次を追加します:
+
+```json
+{
+  "mcpServers": {
+    "mem-mcp": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "git+https://github.com/memovai/memov.git",
+        "mem-mcp-launcher",
+        "stdio",
+        "/absolute/path/to/your/project"
+      ]
+    }
+  }
+}
+```
+
+`/absolute/path/to/your/project` をプロジェクトディレクトリの実際の絶対パスに置き換えてください（例: macOS/Linux では `/Users/username/projects/my-project`、Windows では `C:\Users\username\projects\my-project`）。
+
+</details>
+
 
 <details>
 <summary><b>VectorDB対応（RAGモード）</b> 🚧 WIP</summary>

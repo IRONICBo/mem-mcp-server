@@ -32,6 +32,7 @@ MemoV ist eine Speicherschicht für KI-Coding-Agenten, die **nachverfolgbare**, 
 
 </div>
 
+![MemoV Time](../images/ALL.png)
 - 💬 [Tritt unserem Discord bei](https://discord.gg/un54aD7Hug) und tauche in smarteres Vibe-Engineering ein
 
 ## Funktionen
@@ -43,6 +44,8 @@ MemoV ist eine Speicherschicht für KI-Coding-Agenten, die **nachverfolgbare**, 
 - **Visuelle UI** — Sag "mem ui" im Chat, und sieh es unter http://localhost:38888
 - **Privatsphäre zuerst** — Lokal, keine Datenbank, kein Overhead. Nutze .memignore zum Ausschließen
 
+
+![MemoV Time](../images/one.png)
 ## Schnellstart (MCP-Installation)
 
 ### Voraussetzungen
@@ -124,6 +127,35 @@ Gehe zu **Files > Preferences > Cursor Settings > MCP** und füge hinzu:
 ```
 
 </details>
+
+<details>
+<summary><b>Antigravity</b></summary>
+
+> **Hinweis:** Antigravity unterstützt die Variable "${workspaceFolder}" nicht. Bitte gib den absoluten Pfad deines Projektverzeichnisses manuell ein.
+
+Gehe zu **Settings > MCP** und füge hinzu:
+
+```json
+{
+  "mcpServers": {
+    "mem-mcp": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "git+https://github.com/memovai/memov.git",
+        "mem-mcp-launcher",
+        "stdio",
+        "/absolute/path/to/your/project"
+      ]
+    }
+  }
+}
+```
+
+Ersetze `/absolute/path/to/your/project` durch den tatsächlichen absoluten Pfad deines Projektverzeichnisses (z.B. `/Users/username/projects/my-project` unter macOS/Linux oder `C:\Users\username\projects\my-project` unter Windows).
+
+</details>
+
 
 <details>
 <summary><b>Mit VectorDB (RAG-Modus)</b> 🚧 WIP</summary>

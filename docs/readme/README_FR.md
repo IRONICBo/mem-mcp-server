@@ -32,6 +32,7 @@ MemoV est une couche mémoire pour les agents de codage IA qui fournit un contr�
 
 </div>
 
+![MemoV Time](../images/ALL.png)
 - 💬 [Rejoignez notre Discord](https://discord.gg/un54aD7Hug) et plongez dans l'ingénierie vibe plus intelligente
 
 ## Fonctionnalités
@@ -43,6 +44,8 @@ MemoV est une couche mémoire pour les agents de codage IA qui fournit un contr�
 - **UI Visuelle** — Dites "mem ui" dans le chat, et voyez sur http://localhost:38888
 - **Vie privée d'abord** — Local, pas de base de données, pas d'overhead. Utilisez .memignore pour exclure
 
+
+![MemoV Time](../images/one.png)
 ## Démarrage Rapide (Installation MCP)
 
 ### Prérequis
@@ -124,6 +127,35 @@ Allez dans **Files > Preferences > Cursor Settings > MCP**, puis ajoutez:
 ```
 
 </details>
+
+<details>
+<summary><b>Antigravity</b></summary>
+
+> **Note :** Antigravity ne prend pas en charge la variable "${workspaceFolder}". Saisissez manuellement le chemin absolu de votre projet.
+
+Allez dans **Settings > MCP**, puis ajoutez :
+
+```json
+{
+  "mcpServers": {
+    "mem-mcp": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "git+https://github.com/memovai/memov.git",
+        "mem-mcp-launcher",
+        "stdio",
+        "/absolute/path/to/your/project"
+      ]
+    }
+  }
+}
+```
+
+Remplacez `/absolute/path/to/your/project` par le chemin absolu réel de votre projet (par ex. `/Users/username/projects/my-project` sur macOS/Linux ou `C:\Users\username\projects\my-project` sur Windows).
+
+</details>
+
 
 <details>
 <summary><b>Avec VectorDB (mode RAG)</b> 🚧 WIP</summary>

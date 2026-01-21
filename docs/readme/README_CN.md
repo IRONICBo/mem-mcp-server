@@ -32,6 +32,7 @@ MemoV 是 AI 编程代理的记忆层，提供**可追溯**、**Git 驱动**的�
 
 </div>
 
+![MemoV Time](../images/ALL.png)
 - 💬 [加入我们的 Discord](https://discord.gg/un54aD7Hug)，探索更智能的 vibe 工程
 
 ## 功能特性
@@ -43,6 +44,8 @@ MemoV 是 AI 编程代理的记忆层，提供**可追溯**、**Git 驱动**的�
 - **可视化界面** — 在对话中说 "mem ui"，访问 http://localhost:38888 查看
 - **隐私优先** — 本地存储，无数据库，零开销。使用 .memignore 排除文件
 
+
+![MemoV Time](../images/one.png)
 ## 快速开始（MCP 安装）
 
 ### 前置条件
@@ -124,6 +127,35 @@ codex mcp add mem-mcp -- uvx --from git+https://github.com/memovai/memov.git mem
 ```
 
 </details>
+
+<details>
+<summary><b>Antigravity</b></summary>
+
+> **注意:** Antigravity 不支持 "${workspaceFolder}" 变量，请手动填写项目目录的绝对路径。
+
+前往 **Settings > MCP**，然后添加：
+
+```json
+{
+  "mcpServers": {
+    "mem-mcp": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "git+https://github.com/memovai/memov.git",
+        "mem-mcp-launcher",
+        "stdio",
+        "/absolute/path/to/your/project"
+      ]
+    }
+  }
+}
+```
+
+将 `/absolute/path/to/your/project` 替换为项目目录的实际绝对路径（例如 macOS/Linux 上 `/Users/username/projects/my-project` 或 Windows 上 `C:\Users\username\projects\my-project`）。
+
+</details>
+
 
 <details>
 <summary><b>启用向量数据库（RAG 模式）</b> 🚧 WIP</summary>

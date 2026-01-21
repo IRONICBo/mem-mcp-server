@@ -32,6 +32,7 @@ MemoV는 AI 코딩 에이전트를 위한 메모리 레이어로, 프롬프트, 
 
 </div>
 
+![MemoV Time](../images/ALL.png)
 - 💬 [Discord에 참여](https://discord.gg/un54aD7Hug)하여 더 스마트한 바이브 엔지니어링을 탐험하세요
 
 ## 기능
@@ -43,6 +44,8 @@ MemoV는 AI 코딩 에이전트를 위한 메모리 레이어로, 프롬프트, 
 - **비주얼 UI** — 채팅에서 "mem ui"라고 말하면 http://localhost:38888에서 확인
 - **프라이버시 우선** — 로컬, 데이터베이스 없음, 오버헤드 없음. .memignore로 제외
 
+
+![MemoV Time](../images/one.png)
 ## 빠른 시작 (MCP 설치)
 
 ### 사전 요구 사항
@@ -124,6 +127,35 @@ codex mcp add mem-mcp -- uvx --from git+https://github.com/memovai/memov.git mem
 ```
 
 </details>
+
+<details>
+<summary><b>Antigravity</b></summary>
+
+> **참고:** Antigravity 는 "${workspaceFolder}" 변수를 지원하지 않습니다. 프로젝트 디렉터리의 절대 경로를 수동으로 입력하세요.
+
+**Settings > MCP** 로 이동한 다음 추가하세요:
+
+```json
+{
+  "mcpServers": {
+    "mem-mcp": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "git+https://github.com/memovai/memov.git",
+        "mem-mcp-launcher",
+        "stdio",
+        "/absolute/path/to/your/project"
+      ]
+    }
+  }
+}
+```
+
+`/absolute/path/to/your/project` 를 프로젝트 디렉터리의 실제 절대 경로로 바꾸세요(예: macOS/Linux 는 `/Users/username/projects/my-project`, Windows 는 `C:\Users\username\projects\my-project`).
+
+</details>
+
 
 <details>
 <summary><b>VectorDB 포함 (RAG 모드)</b> 🚧 WIP</summary>

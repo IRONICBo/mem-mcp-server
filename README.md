@@ -36,8 +36,8 @@ MemoV is a memory layer for AI coding agents that provides **traceable**, **Git-
   <img src="docs/images/readme.gif" alt="MemoV Demo" width="800px">
 </p> -->
 
-![MemoV Time](docs/images/ALL.png)
 
+![MemoV Time](docs/images/ALL.png)
 - 💬 [Join our Discord](https://discord.gg/un54aD7Hug) and dive into smarter vibe engineering
 
 <!-- <div align="center">
