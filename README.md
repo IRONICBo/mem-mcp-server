@@ -36,6 +36,8 @@ MemoV is a memory layer for AI coding agents that provides **traceable**, **Git-
   <img src="docs/images/readme.gif" alt="MemoV Demo" width="800px">
 </p> -->
 
+![MemoV Time](docs/images/memov-time.png)
+
 - 💬 [Join our Discord](https://discord.gg/un54aD7Hug) and dive into smarter vibe engineering
 
 <!-- <div align="center">
@@ -134,6 +136,34 @@ Go to **Files > Preferences > Cursor Settings > MCP**, then add:
   }
 }
 ```
+
+</details>
+
+<details>
+<summary><b>Antigravity</b></summary>
+
+> **Note:** Antigravity does not support `"${workspaceFolder}"` variable. Please manually enter the absolute path to your project directory.
+
+Go to **Settings > MCP**, then add:
+
+```json
+{
+  "mcpServers": {
+    "mem-mcp": {
+      "command": "uvx",
+      "args": [
+        "--from",
+        "git+https://github.com/memovai/memov.git",
+        "mem-mcp-launcher",
+        "stdio",
+        "/absolute/path/to/your/project"
+      ]
+    }
+  }
+}
+```
+
+Replace `/absolute/path/to/your/project` with the actual absolute path to your project directory (e.g., `/Users/username/projects/my-project` on macOS/Linux or `C:\\Users\\username\\projects\\my-project` on Windows).
 
 </details>
 
