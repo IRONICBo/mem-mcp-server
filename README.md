@@ -36,7 +36,7 @@ MemoV is a memory layer for AI coding agents that provides **traceable**, **Git-
   <img src="docs/images/readme.gif" alt="MemoV Demo" width="800px">
 </p> -->
 
-![MemoV Time](docs/images/memov-time.png)
+![MemoV Time](docs/images/ALL.png)
 
 - 💬 [Join our Discord](https://discord.gg/un54aD7Hug) and dive into smarter vibe engineering
 
@@ -56,6 +56,7 @@ MemoV is a memory layer for AI coding agents that provides **traceable**, **Git-
 - **Visual UI**: Say "mem ui" in chat, and view at http://localhost:38888
 - **Private-first** — Local, no database, no overhead. Use .memignore to exclude
 
+![MemoV Time](docs/images/one.png)
 
 ## Quick Start (MCP Installation)
 
