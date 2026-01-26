@@ -13,6 +13,14 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+from memov.constants.prompts import (
+    AI_SEARCH_SYSTEM_PROMPT,
+    AI_SEARCH_USER_PROMPT_TEMPLATE,
+    CLUSTER_SYSTEM_PROMPT,
+    CLUSTER_USER_PROMPT_TEMPLATE,
+    SKILL_SYSTEM_PROMPT,
+    SKILL_USER_PROMPT_TEMPLATE,
+)
 from memov.core.manager import MemovManager, MemStatus
 from memov.storage.skills_db import SkillsDB
 
@@ -462,31 +470,11 @@ def create_app(project_path: str) -> "FastAPI":
         history_context = "\n".join(history_text)
 
         # Build AI prompt
-        system_prompt = """You are an AI assistant helping users search their code history.
-You will be given a list of commits with their prompts/messages.
-Answer the user's question based ONLY on this history. Be concise.
-
-LANGUAGE:
-- Respond in ENGLISH only.
-
-OUTPUT FORMAT (STRICT JSON ONLY):
-- Return ONLY a JSON object (no markdown, no code fences, no extra text).
-- The JSON object MUST contain exactly these keys:
-  - "answer": a concise string answer in the user's language
-  - "commit_ids": an array of 7-character commit hashes (strings) that are relevant
-- Use only commit hashes that appear in the provided history.
-- If the history does NOT contain relevant information, set "commit_ids" to an empty array and answer with a short "not found" message.
-
-Example:
-{"answer":"You fixed the login bug in commit abc1234","commit_ids":["abc1234"]}"""
-
-        user_prompt = f"""Commit history (format: [hash] branch | prompt):
-
-{history_context}
-
-Question: {request.query}
-
-Return ONLY the JSON object with "answer" and "commit_ids" as specified."""
+        system_prompt = AI_SEARCH_SYSTEM_PROMPT
+        user_prompt = AI_SEARCH_USER_PROMPT_TEMPLATE.format(
+            history_context=history_context,
+            query=request.query,
+        )
 
         try:
             if request.provider == "anthropic":
@@ -596,28 +584,10 @@ Return ONLY the JSON object with "answer" and "commit_ids" as specified."""
         short_to_full: dict[str, dict] = {}
         short_to_entry: dict[str, dict] = {}
 
-        cluster_system_prompt = """You are a code assistant summarizing commit history.
-You will be given a list of commits with prompts and metadata.
-
-LANGUAGE:
-- Respond in ENGLISH only.
-
-OUTPUT FORMAT (STRICT JSON ONLY):
-- Return ONLY a JSON object (no markdown, no extra text).
-- The JSON must have a top-level key "features".
-- "features" is an array of objects with:
-  - "name": short feature name (string)
-  - "summary": concise feature summary (string)
-  - "commit_ids": array of 7-char commit hashes (strings)
-- Use only commit hashes that appear in the provided history.
-"""
-
-        cluster_user_prompt = f"""Task: Cluster the commits into distinct product features.
-
-Commit history (format: [hash] branch | op | prompt | files):
-{history_context}
-
-Return JSON only with the required schema."""
+        cluster_system_prompt = CLUSTER_SYSTEM_PROMPT
+        cluster_user_prompt = CLUSTER_USER_PROMPT_TEMPLATE.format(
+            history_context=history_context
+        )
 
         cluster_response = ""
         cluster_payload: Optional[dict] = None
@@ -636,12 +606,9 @@ Return JSON only with the required schema."""
                 f"max_commits={max_commits}, max_chars={max_chars}, "
                 f"context_len={len(history_context)}"
             )
-            cluster_user_prompt = f"""Task: Cluster the commits into distinct product features.
-
-Commit history (format: [hash] branch | op | prompt | files):
-{history_context}
-
-Return JSON only with the required schema."""
+            cluster_user_prompt = CLUSTER_USER_PROMPT_TEMPLATE.format(
+                history_context=history_context
+            )
 
             try:
                 cluster_response = await _call_openai(
@@ -754,26 +721,12 @@ Return JSON only with the required schema."""
                     commit_lines.append(f"[{commit['commit_short']}] {commit['commit_hash']}")
             commits_text = "\n".join(commit_lines)
 
-            skill_system_prompt = """You are a code assistant creating a short skills document for a feature.
-You will be given a feature name, summary, and related commits.
-
-LANGUAGE:
-- Respond in ENGLISH only.
-
-OUTPUT FORMAT (STRICT JSON ONLY):
-- Return ONLY a JSON object with:
-  - "title": short title (string)
-  - "content": concise skills summary in 3-6 sentences (string)
-  - "label": 1-2 word tag (string)
-- Do not include markdown or extra fields.
-"""
-
-            skill_user_prompt = f"""Feature: {feature.name}
-Summary: {feature.summary}
-Commits:
-{commits_text}
-
-Return JSON only with the required schema."""
+            skill_system_prompt = SKILL_SYSTEM_PROMPT
+            skill_user_prompt = SKILL_USER_PROMPT_TEMPLATE.format(
+                feature_name=feature.name,
+                feature_summary=feature.summary,
+                commits_text=commits_text,
+            )
 
             try:
                 skill_response = await _call_openai(
